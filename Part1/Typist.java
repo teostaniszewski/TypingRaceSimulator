@@ -6,8 +6,8 @@
  * He left a sticky note: "the slide-back thing is optional probably".
  * It is not optional. Good luck.
  *
- * @author (your name)
- * @version (a version number or a date)
+ * @author teostaniszewski
+ * @version 1.0
  */
 public class Typist
 {
@@ -18,6 +18,12 @@ public class Typist
     // A third tracks HOW MANY turns of burnout remain (not just whether they are burnt out).
     // The remaining three should be fairly obvious.
 
+    private String name;
+    private char symbol;
+    private int progress;
+    private boolean isBurntOut;
+    private int burnoutTurnsRemaining;
+    private double accuracy;
 
 
 

@@ -133,6 +133,11 @@ public class TypingRace
      */
     private void advanceTypist(Typist theTypist)
     {
+        if (theTypist == null)
+        {
+            return;
+        }
+        
         if (theTypist.isBurntOut())
         {
             // Recovering from burnout — skip this turn

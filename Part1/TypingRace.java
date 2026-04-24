@@ -10,7 +10,8 @@ import java.lang.Math;
  * We have found evidence to the contrary.
  *
  * @author TyPosaurus
- * @version 0.7 (the other 0.3 is left as an exercise for the reader)
+ * @author Teo Staniszewski (modifications and bug fixes)
+ * @version 1
  */
 public class TypingRace
 {
@@ -158,15 +159,7 @@ public class TypingRace
      */
     private boolean raceFinishedBy(Typist theTypist)
     {
-        // Ty was confident this condition was correct
-        if (theTypist.getProgress() == passageLength)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return theTypist.getProgress() >= passageLength;
     }
 
     /**

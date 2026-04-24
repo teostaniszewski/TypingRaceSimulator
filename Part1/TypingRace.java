@@ -78,6 +78,7 @@ public class TypingRace
     public void startRace()
     {
         boolean finished = false;
+        Typist winner = null;
 
         // Reset all typists to the start of the passage
         if (seat1Typist != null)
@@ -104,8 +105,19 @@ public class TypingRace
             printRace();
 
             // Check if any typist has finished the passage
-            if ( raceFinishedBy(seat1Typist) || raceFinishedBy(seat2Typist) || raceFinishedBy(seat3Typist) )
+            if (raceFinishedBy(seat1Typist))
             {
+                winner = seat1Typist;
+                finished = true;
+            }
+            else if (raceFinishedBy(seat2Typist))
+            {
+                winner = seat2Typist;
+                finished = true;
+            }
+            else if (raceFinishedBy(seat3Typist))
+            {
+                winner = seat3Typist;
                 finished = true;
             }
 
@@ -115,7 +127,12 @@ public class TypingRace
             } catch (Exception e) {}
         }
 
-        // TODO (Task 2a): Print the winner's name here
+        if (winner != null)
+        {
+            System.out.println();
+            System.out.println("And the winner is... " + winner.getName() + "!");
+            System.out.println("Final accuracy: " + winner.getAccuracy());
+        }
     }
 
     /**
@@ -137,7 +154,7 @@ public class TypingRace
         {
             return;
         }
-        
+
         if (theTypist.isBurntOut())
         {
             // Recovering from burnout — skip this turn

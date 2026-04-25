@@ -144,3 +144,8 @@ public class TypingRaceGUI
         new TypingRaceGUI();
     }
 }
+package Part2;
+
+public class TypingRaceGUI {
+    
+}

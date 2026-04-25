@@ -236,8 +236,8 @@ public class TypingRace
 
     /**
      * Prints the current state of the race to the terminal.
-     * Shows each typist's position along the passage, burnout state,
-     * and a WPM estimate based on current progress.
+     * Shows each typist's position along the passage, burnout state (with ~), 
+     * and recent mistypes (with [<]).
      */
     private void printRace()
     {
@@ -265,7 +265,7 @@ public class TypingRace
      * Prints a single typist's lane.
      *
      * Examples:
-     *   |          1           | TURBOFINGERS (Accuracy: 0.85)
+     *   |          1         | TURBOFINGERS (Accuracy: 0.85)
      *   |    2~              | HUNT_N_PECK  (Accuracy: 0.40) BURNT OUT (2 turns)
      *
      * @param theTypist the typist whose lane to print

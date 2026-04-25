@@ -15,12 +15,19 @@ public class TypingRaceGUI
     private JFrame frame;
     private JPanel mainPanel;
 
+    private JComboBox<String> passageComboBox;
+    private JTextArea customPassageArea;
+    private JLabel passageLengthLabel;
+
+    private String selectedPassage;
+
     /**
      * Constructor for TypingRaceGUI.
      * Sets up the main GUI window.
      */
     public TypingRaceGUI()
     {
+        selectedPassage = "";
         createWindow();
     }
 
@@ -40,17 +47,83 @@ public class TypingRaceGUI
         JLabel titleLabel = new JLabel("Typing Race Simulator", JLabel.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 28));
 
-        JLabel subtitleLabel = new JLabel("Part II - GUI Module Development", JLabel.CENTER);
-        subtitleLabel.setFont(new Font("Arial", Font.PLAIN, 16));
-
-        JPanel headerPanel = new JPanel(new GridLayout(2, 1));
+        JPanel headerPanel = new JPanel(new GridLayout(1, 1));
         headerPanel.add(titleLabel);
-        headerPanel.add(subtitleLabel);
 
         mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(createPassagePanel(), BorderLayout.CENTER);
 
         frame.add(mainPanel);
         frame.setVisible(true);
+    }
+
+    /**
+     * Creates the panel used for selecting or entering a passage.
+     *
+     * @return the passage selection panel
+     */
+    private JPanel createPassagePanel()
+    {
+        JPanel passagePanel = new JPanel(new BorderLayout(10, 10));
+        passagePanel.setBorder(BorderFactory.createTitledBorder("Passage Selection"));
+
+        String[] passages = {
+            "Short: The quick brown fox jumps over the lazy dog.",
+            "Medium: Java Swing allows developers to build interactive graphical applications.",
+            "Long: Object oriented programming helps structure larger programs by separating data and behaviour into classes and objects.",
+            "Custom Passage"
+        };
+
+        passageComboBox = new JComboBox<>(passages);
+
+        customPassageArea = new JTextArea(5, 40);
+        customPassageArea.setLineWrap(true);
+        customPassageArea.setWrapStyleWord(true);
+        customPassageArea.setEnabled(false);
+
+        passageLengthLabel = new JLabel("Passage length: 44 characters");
+
+        passageComboBox.addActionListener(e -> updateSelectedPassage());
+
+        customPassageArea.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent e)
+            {
+                updateSelectedPassage();
+            }
+        });
+
+        JPanel topPanel = new JPanel(new GridLayout(2, 1, 5, 5));
+        topPanel.add(new JLabel("Choose a passage:"));
+        topPanel.add(passageComboBox);
+
+        passagePanel.add(topPanel, BorderLayout.NORTH);
+        passagePanel.add(new JScrollPane(customPassageArea), BorderLayout.CENTER);
+        passagePanel.add(passageLengthLabel, BorderLayout.SOUTH);
+
+        updateSelectedPassage();
+
+        return passagePanel;
+    }
+
+    /**
+     * Updates the selected passage based on the dropdown or custom text area.
+     */
+    private void updateSelectedPassage()
+    {
+        String selectedOption = (String) passageComboBox.getSelectedItem();
+
+        if ("Custom Passage".equals(selectedOption))
+        {
+            customPassageArea.setEnabled(true);
+            selectedPassage = customPassageArea.getText();
+        }
+        else
+        {
+            customPassageArea.setEnabled(false);
+            selectedPassage = selectedOption.substring(selectedOption.indexOf(":") + 2);
+        }
+
+        passageLengthLabel.setText("Passage length: " + selectedPassage.length() + " characters");
     }
 
     /**

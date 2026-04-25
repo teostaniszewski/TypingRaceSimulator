@@ -1,6 +1,9 @@
 /**
- * Write a description of class Typist here.
- *
+ * The Typist class represents a participant in the typing race.
+ * It tracks the typist’s name, symbol, accuracy, progress, and burnout state.
+ * Typists move forward when typing correctly, slide back on mistakes,
+ * and cannot type while burnt out.
+ * 
  * Starter code generously abandoned by Ty Posaurus, your predecessor,
  * who typed with two fingers and considered that "good enough".
  * He left a sticky note: "the slide-back thing is optional probably".
@@ -12,11 +15,6 @@
 public class Typist
 {
     // Fields of class Typist
-    // Hint: you will need six fields. Think carefully about their types.
-    // One of them tracks how far along the passage the typist has reached.
-    // Another tracks whether the typist is currently burnt out.
-    // A third tracks HOW MANY turns of burnout remain (not just whether they are burnt out).
-    // The remaining three should be fairly obvious.
 
     private String name;
     private char symbol;

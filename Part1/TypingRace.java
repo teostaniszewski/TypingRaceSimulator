@@ -187,6 +187,11 @@ public class TypingRace
      */
     private boolean raceFinishedBy(Typist theTypist)
     {
+        if (theTypist == null)
+        {
+            return false;
+        }
+
         return theTypist.getProgress() >= passageLength;
     }
 

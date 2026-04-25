@@ -22,6 +22,8 @@ public class TypingRaceGUI
     private JCheckBox autocorrectCheckBox;
     private JCheckBox caffeineModeCheckBox;
     private JCheckBox nightShiftCheckBox;
+    private JComboBox<String> typingStyleComboBox;
+    private JLabel typingStyleImpactLabel;
 
     private String selectedPassage;
 
@@ -190,12 +192,64 @@ public class TypingRaceGUI
      *
      * @return the customise typists panel
      */
+    /**
+     * Creates the customisation panel for typist options.
+     * This includes typing style choices that affect the typist's behaviour.
+     *
+     * @return the customise typists panel
+     */
     private JPanel createCustomiseTypistsPanel()
     {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+        JPanel stylePanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        stylePanel.setBorder(BorderFactory.createTitledBorder("Typing Style"));
+
+        String[] typingStyles = {
+            "Touch Typist",
+            "Hunt & Peck",
+            "Phone Thumbs",
+            "Voice-to-Text"
+        };
+
+        typingStyleComboBox = new JComboBox<>(typingStyles);
+        typingStyleImpactLabel = new JLabel("Impact: Balanced accuracy and speed.");
+
+        typingStyleComboBox.addActionListener(e -> updateTypingStyleImpact());
+
+        stylePanel.add(new JLabel("Choose typing style:"));
+        stylePanel.add(typingStyleComboBox);
+        stylePanel.add(typingStyleImpactLabel);
+
+        panel.add(stylePanel, BorderLayout.NORTH);
+
         return panel;
+    }
+
+    /**
+     * Updates the description of how the selected typing style affects performance.
+     */
+    private void updateTypingStyleImpact()
+    {
+        String selectedStyle = (String) typingStyleComboBox.getSelectedItem();
+
+        if ("Touch Typist".equals(selectedStyle))
+        {
+            typingStyleImpactLabel.setText("Impact: Balanced accuracy and speed.");
+        }
+        else if ("Hunt & Peck".equals(selectedStyle))
+        {
+            typingStyleImpactLabel.setText("Impact: Lower speed, slightly lower burnout risk.");
+        }
+        else if ("Phone Thumbs".equals(selectedStyle))
+        {
+            typingStyleImpactLabel.setText("Impact: Moderate speed, higher mistype chance.");
+        }
+        else if ("Voice-to-Text".equals(selectedStyle))
+        {
+            typingStyleImpactLabel.setText("Impact: Fast input, but accuracy may vary.");
+        }
     }
 
     /**

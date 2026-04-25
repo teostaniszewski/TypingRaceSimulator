@@ -10,7 +10,8 @@ import java.lang.Math;
  * We have found evidence to the contrary.
  *
  * @author TyPosaurus
- * @version 0.7 (the other 0.3 is left as an exercise for the reader)
+ * @author Teo Staniszewski (modifications and bug fixes)
+ * @version 1
  */
 public class TypingRace
 {
@@ -18,9 +19,12 @@ public class TypingRace
     private Typist seat1Typist;
     private Typist seat2Typist;
     private Typist seat3Typist;
+    
+    private boolean seat1JustMistyped;
+    private boolean seat2JustMistyped;
+    private boolean seat3JustMistyped;
 
     // Accuracy thresholds for mistype and burnout events
-    // (Ty tuned these values "by feel". They may need adjustment.)
     private static final double MISTYPE_BASE_CHANCE = 0.3;
     private static final int    SLIDE_BACK_AMOUNT   = 2;
     private static final int    BURNOUT_DURATION     = 3;
@@ -38,6 +42,9 @@ public class TypingRace
         seat1Typist = null;
         seat2Typist = null;
         seat3Typist = null;
+        seat1JustMistyped = false;
+        seat2JustMistyped = false;
+        seat3JustMistyped = false;
     }
 
     /**
@@ -70,32 +77,54 @@ public class TypingRace
      * Starts the typing race.
      * All typists are reset to the beginning, then the simulation runs
      * turn by turn until one typist completes the full passage.
-     *
-     * Note from Ty: "I didn't bother printing the winner at the end,
-     * you can probably figure that out yourself."
      */
     public void startRace()
     {
         boolean finished = false;
+        Typist winner = null;
 
         // Reset all typists to the start of the passage
-        // (Ty was in a hurry here)
-        seat1Typist.resetToStart();
-        seat2Typist.resetToStart();
+        if (seat1Typist != null)
+        {
+            seat1Typist.resetToStart();
+        }
+        if (seat2Typist != null)
+        {
+            seat2Typist.resetToStart();
+        }
+        if (seat3Typist != null)
+        {
+            seat3Typist.resetToStart();
+        }
 
         while (!finished)
         {
+            seat1JustMistyped = false;
+            seat2JustMistyped = false;
+            seat3JustMistyped = false;
+
             // Advance each typist by one turn
-            advanceTypist(seat1Typist);
-            advanceTypist(seat2Typist);
-            advanceTypist(seat3Typist);
+            advanceTypist(seat1Typist, 1);
+            advanceTypist(seat2Typist, 2);
+            advanceTypist(seat3Typist, 3);
 
             // Print the current state of the race
             printRace();
 
             // Check if any typist has finished the passage
-            if ( raceFinishedBy(seat1Typist) || raceFinishedBy(seat2Typist) || raceFinishedBy(seat3Typist) )
+            if (raceFinishedBy(seat1Typist))
             {
+                winner = seat1Typist;
+                finished = true;
+            }
+            else if (raceFinishedBy(seat2Typist))
+            {
+                winner = seat2Typist;
+                finished = true;
+            }
+            else if (raceFinishedBy(seat3Typist))
+            {
+                winner = seat3Typist;
                 finished = true;
             }
 
@@ -105,7 +134,16 @@ public class TypingRace
             } catch (Exception e) {}
         }
 
-        // TODO (Task 2a): Print the winner's name here
+        if (winner != null)
+        {
+            double oldAccuracy = winner.getAccuracy();
+            winner.setAccuracy(oldAccuracy + 0.02);
+
+            System.out.println();
+            System.out.println("And the winner is... " + winner.getName() + "!");
+            System.out.println("Final accuracy: " + formatAccuracy(winner.getAccuracy())
+                + " (improved from " + formatAccuracy(oldAccuracy) + ")");
+        }
     }
 
     /**
@@ -120,9 +158,15 @@ public class TypingRace
      *     who are pushing themselves too hard.
      *
      * @param theTypist the typist to advance
+     * @param seatNumber the seat number (1–3) of the typist
      */
-    private void advanceTypist(Typist theTypist)
+    private void advanceTypist(Typist theTypist, int seatNumber)
     {
+        if (theTypist == null)
+        {
+            return;
+        }
+
         if (theTypist.isBurntOut())
         {
             // Recovering from burnout — skip this turn
@@ -137,9 +181,10 @@ public class TypingRace
         }
 
         // Mistype check — the probability should reflect the typist's accuracy
-        if (Math.random() < theTypist.getAccuracy() * MISTYPE_BASE_CHANCE)
+        if (Math.random() < (1.0 - theTypist.getAccuracy()) * MISTYPE_BASE_CHANCE)
         {
             theTypist.slideBack(SLIDE_BACK_AMOUNT);
+            markMistyped(seatNumber);
         }
 
         // Burnout check — pushing too hard increases burnout risk
@@ -147,6 +192,7 @@ public class TypingRace
         if (Math.random() < 0.05 * theTypist.getAccuracy() * theTypist.getAccuracy())
         {
             theTypist.burnOut(BURNOUT_DURATION);
+            theTypist.setAccuracy(theTypist.getAccuracy() - 0.01);
         }
     }
 
@@ -158,58 +204,79 @@ public class TypingRace
      */
     private boolean raceFinishedBy(Typist theTypist)
     {
-        // Ty was confident this condition was correct
-        if (theTypist.getProgress() == passageLength)
-        {
-            return true;
-        }
-        else
+        if (theTypist == null)
         {
             return false;
+        }
+
+        return theTypist.getProgress() >= passageLength;
+    }
+
+    /**
+     * Marks that a typist in a given seat has just mistyped during this turn.
+     * This is used to display the [<] indicator in the race output.
+     *
+     * @param seatNumber the seat number of the typist (1–3)
+     */
+    private void markMistyped(int seatNumber)
+    {
+        if (seatNumber == 1)
+        {
+            seat1JustMistyped = true;
+        }
+        else if (seatNumber == 2)
+        {
+            seat2JustMistyped = true;
+        }
+        else if (seatNumber == 3)
+        {
+            seat3JustMistyped = true;
         }
     }
 
     /**
      * Prints the current state of the race to the terminal.
-     * Shows each typist's position along the passage, burnout state,
-     * and a WPM estimate based on current progress.
+     * Shows each typist's position along the passage, burnout state (with ~), 
+     * and recent mistypes (with [<]).
      */
     private void printRace()
     {
         System.out.print('\u000C'); // Clear terminal
 
-        System.out.println("  TYPING RACE — passage length: " + passageLength + " chars");
+        System.out.println("  TYPING RACE - passage length: " + passageLength + " chars");
         multiplePrint('=', passageLength + 3);
         System.out.println();
 
-        printSeat(seat1Typist);
+        printSeat(seat1Typist, seat1JustMistyped);
         System.out.println();
 
-        printSeat(seat2Typist);
+        printSeat(seat2Typist, seat2JustMistyped);
         System.out.println();
 
-        printSeat(seat3Typist);
+        printSeat(seat3Typist, seat3JustMistyped);
         System.out.println();
 
         multiplePrint('=', passageLength + 3);
         System.out.println();
-        System.out.println("  [zz] = burnt out    [<] = just mistyped");
+        System.out.println("  [~] = burnt out    [<] = just mistyped");
     }
 
     /**
      * Prints a single typist's lane.
      *
      * Examples:
-     *   |          ⌨           | TURBOFINGERS (Accuracy: 0.85)
-     *   |    [zz]              | HUNT_N_PECK  (Accuracy: 0.40) BURNT OUT (2 turns)
-     *
-     * Note: Ty forgot to show when a typist has just mistyped. That would
-     * be a nice improvement — perhaps a [<] marker after their symbol.
+     *   |          1         | TURBOFINGERS (Accuracy: 0.85)
+     *   |    2~              | HUNT_N_PECK  (Accuracy: 0.40) BURNT OUT (2 turns)
      *
      * @param theTypist the typist whose lane to print
+     * @param justMistyped whether to show the [<] indicator for a recent mistype
      */
-    private void printSeat(Typist theTypist)
+    private void printSeat(Typist theTypist, boolean justMistyped)
     {
+        if (theTypist == null)
+        {
+            return;
+        }
         int spacesBefore = theTypist.getProgress();
         int spacesAfter  = passageLength - theTypist.getProgress();
 
@@ -225,6 +292,17 @@ public class TypingRace
             spacesAfter--; // symbol + ~ together take two characters
         }
 
+        if (justMistyped)
+        {
+            System.out.print(" [<]");
+            spacesAfter = spacesAfter - 4;
+        }
+
+        if (spacesAfter < 0)
+        {
+            spacesAfter = 0;
+        }
+
         multiplePrint(' ', spacesAfter);
         System.out.print('|');
         System.out.print(' ');
@@ -233,14 +311,30 @@ public class TypingRace
         if (theTypist.isBurntOut())
         {
             System.out.print(theTypist.getName()
-                + " (Accuracy: " + theTypist.getAccuracy() + ")"
+                + " (Accuracy: " + formatAccuracy(theTypist.getAccuracy()) + ")"
                 + " BURNT OUT (" + theTypist.getBurnoutTurnsRemaining() + " turns)");
         }
         else
         {
             System.out.print(theTypist.getName()
-                + " (Accuracy: " + theTypist.getAccuracy() + ")");
+                + " (Accuracy: " + formatAccuracy(theTypist.getAccuracy()) + ")");
         }
+
+        if (justMistyped)
+        {
+            System.out.print(" <- just mistyped");
+        }
+    }
+
+    /**
+     * Formats an accuracy value to two decimal places for clearer output.
+     *
+     * @param accuracyValue the accuracy value to format
+     * @return the formatted accuracy value as a String
+     */
+    private String formatAccuracy(double accuracyValue)
+    {
+        return String.format("%.2f", accuracyValue);
     }
 
     /**
@@ -258,4 +352,5 @@ public class TypingRace
             i = i + 1;
         }
     }
+
 }

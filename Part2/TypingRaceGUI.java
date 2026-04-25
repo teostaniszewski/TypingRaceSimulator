@@ -37,7 +37,7 @@ public class TypingRaceGUI
 
     /**
      * Creates the main application window and layout.
-     * Adds the race configuration panel.
+     * Adds the tabbed GUI structure.
      */
     private void createWindow()
     {
@@ -52,8 +52,12 @@ public class TypingRaceGUI
         JLabel titleLabel = new JLabel("Typing Race Simulator", JLabel.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 26));
 
+        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.addTab("Race Configuration", createRaceConfigurationPanel());
+        tabbedPane.addTab("Customise Typists", createCustomiseTypistsPanel());
+
         mainPanel.add(titleLabel, BorderLayout.NORTH);
-        mainPanel.add(createRaceConfigurationPanel(), BorderLayout.CENTER);
+        mainPanel.add(tabbedPane, BorderLayout.CENTER);
 
         frame.add(mainPanel);
         frame.setVisible(true);
@@ -176,6 +180,20 @@ public class TypingRaceGUI
         panel.add(autocorrectCheckBox);
         panel.add(caffeineModeCheckBox);
         panel.add(nightShiftCheckBox);
+
+        return panel;
+    }
+
+    /**
+     * Creates the customisation panel for typist options.
+     * This will later include typing style, keyboard type, symbol, colour, and accessories.
+     *
+     * @return the customise typists panel
+     */
+    private JPanel createCustomiseTypistsPanel()
+    {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         return panel;
     }

@@ -25,7 +25,6 @@ public class TypingRace
     private boolean seat3JustMistyped;
 
     // Accuracy thresholds for mistype and burnout events
-    // (Ty tuned these values "by feel". They may need adjustment.)
     private static final double MISTYPE_BASE_CHANCE = 0.3;
     private static final int    SLIDE_BACK_AMOUNT   = 2;
     private static final int    BURNOUT_DURATION     = 3;
@@ -142,8 +141,8 @@ public class TypingRace
 
             System.out.println();
             System.out.println("And the winner is... " + winner.getName() + "!");
-            System.out.println("Final accuracy: " + winner.getAccuracy()
-                + " (improved from " + oldAccuracy + ")");
+            System.out.println("Final accuracy: " + formatAccuracy(winner.getAccuracy())
+                + " (improved from " + formatAccuracy(oldAccuracy) + ")");
         }
     }
 
@@ -244,7 +243,7 @@ public class TypingRace
     {
         System.out.print('\u000C'); // Clear terminal
 
-        System.out.println("  TYPING RACE — passage length: " + passageLength + " chars");
+        System.out.println("  TYPING RACE - passage length: " + passageLength + " chars");
         multiplePrint('=', passageLength + 3);
         System.out.println();
 
@@ -266,8 +265,8 @@ public class TypingRace
      * Prints a single typist's lane.
      *
      * Examples:
-     *   |          ⌨           | TURBOFINGERS (Accuracy: 0.85)
-     *   |    []              | HUNT_N_PECK  (Accuracy: 0.40) BURNT OUT (2 turns)
+     *   |          1           | TURBOFINGERS (Accuracy: 0.85)
+     *   |    2~              | HUNT_N_PECK  (Accuracy: 0.40) BURNT OUT (2 turns)
      *
      * @param theTypist the typist whose lane to print
      * @param justMistyped whether to show the [<] indicator for a recent mistype
@@ -295,8 +294,8 @@ public class TypingRace
 
         if (justMistyped)
         {
-            System.out.print("[<]");
-            spacesAfter = spacesAfter - 3;
+            System.out.print(" [<]");
+            spacesAfter = spacesAfter - 4;
         }
 
         if (spacesAfter < 0)
@@ -312,14 +311,30 @@ public class TypingRace
         if (theTypist.isBurntOut())
         {
             System.out.print(theTypist.getName()
-                + " (Accuracy: " + theTypist.getAccuracy() + ")"
+                + " (Accuracy: " + formatAccuracy(theTypist.getAccuracy()) + ")"
                 + " BURNT OUT (" + theTypist.getBurnoutTurnsRemaining() + " turns)");
         }
         else
         {
             System.out.print(theTypist.getName()
-                + " (Accuracy: " + theTypist.getAccuracy() + ")");
+                + " (Accuracy: " + formatAccuracy(theTypist.getAccuracy()) + ")");
         }
+
+        if (justMistyped)
+        {
+            System.out.print(" <- just mistyped");
+        }
+    }
+
+    /**
+     * Formats an accuracy value to two decimal places for clearer output.
+     *
+     * @param accuracyValue the accuracy value to format
+     * @return the formatted accuracy value as a String
+     */
+    private String formatAccuracy(double accuracyValue)
+    {
+        return String.format("%.2f", accuracyValue);
     }
 
     /**

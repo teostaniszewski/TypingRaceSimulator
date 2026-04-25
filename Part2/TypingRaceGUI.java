@@ -18,6 +18,9 @@ public class TypingRaceGUI
     private JComboBox<String> passageComboBox;
     private JTextArea customPassageArea;
     private JLabel passageLengthLabel;
+    
+    private JComboBox<Integer> seatCountComboBox;
+    private JPanel typistConfigPanel;
 
     private String selectedPassage;
 
@@ -92,9 +95,17 @@ public class TypingRaceGUI
             }
         });
 
-        JPanel topPanel = new JPanel(new GridLayout(2, 1, 5, 5));
+        JPanel topPanel = new JPanel(new GridLayout(3, 1, 5, 5));
         topPanel.add(new JLabel("Choose a passage:"));
         topPanel.add(passageComboBox);
+
+        seatCountComboBox = new JComboBox<>(new Integer[] {2, 3, 4, 5, 6});
+
+        JPanel seatPanel = new JPanel(new GridLayout(2, 1, 5, 5));
+        seatPanel.add(new JLabel("Number of typists:"));
+        seatPanel.add(seatCountComboBox);
+
+        topPanel.add(seatPanel);
 
         passagePanel.add(topPanel, BorderLayout.NORTH);
         passagePanel.add(new JScrollPane(customPassageArea), BorderLayout.CENTER);
@@ -143,9 +154,4 @@ public class TypingRaceGUI
     {
         new TypingRaceGUI();
     }
-}
-package Part2;
-
-public class TypingRaceGUI {
-    
 }

@@ -23,8 +23,7 @@ public class Typist
     private int burnoutTurnsRemaining;
     private double accuracy;
 
-
-
+    
     // Constructor of class Typist
     /**
      * Constructor for objects of class Typist.

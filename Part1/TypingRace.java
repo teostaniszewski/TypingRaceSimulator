@@ -236,6 +236,10 @@ public class TypingRace
      */
     private void printSeat(Typist theTypist)
     {
+        if (theTypist == null)
+        {
+            return;
+        }
         int spacesBefore = theTypist.getProgress();
         int spacesAfter  = passageLength - theTypist.getProgress();
 

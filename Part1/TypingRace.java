@@ -294,6 +294,11 @@ public class TypingRace
             spacesAfter = spacesAfter - 3;
         }
 
+        if (spacesAfter < 0)
+        {
+            spacesAfter = 0;
+        }
+
         multiplePrint(' ', spacesAfter);
         System.out.print('|');
         System.out.print(' ');

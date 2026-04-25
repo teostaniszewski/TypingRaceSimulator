@@ -137,9 +137,13 @@ public class TypingRace
 
         if (winner != null)
         {
+            double oldAccuracy = winner.getAccuracy();
+            winner.setAccuracy(oldAccuracy + 0.02);
+
             System.out.println();
             System.out.println("And the winner is... " + winner.getName() + "!");
-            System.out.println("Final accuracy: " + winner.getAccuracy());
+            System.out.println("Final accuracy: " + winner.getAccuracy()
+                + " (improved from " + oldAccuracy + ")");
         }
     }
 
@@ -189,6 +193,7 @@ public class TypingRace
         if (Math.random() < 0.05 * theTypist.getAccuracy() * theTypist.getAccuracy())
         {
             theTypist.burnOut(BURNOUT_DURATION);
+            theTypist.setAccuracy(theTypist.getAccuracy() - 0.01);
         }
     }
 
@@ -254,7 +259,7 @@ public class TypingRace
 
         multiplePrint('=', passageLength + 3);
         System.out.println();
-        System.out.println("  [zz] = burnt out    [<] = just mistyped");
+        System.out.println("  [~] = burnt out    [<] = just mistyped");
     }
 
     /**
@@ -262,7 +267,7 @@ public class TypingRace
      *
      * Examples:
      *   |          ⌨           | TURBOFINGERS (Accuracy: 0.85)
-     *   |    [zz]              | HUNT_N_PECK  (Accuracy: 0.40) BURNT OUT (2 turns)
+     *   |    []              | HUNT_N_PECK  (Accuracy: 0.40) BURNT OUT (2 turns)
      *
      * @param theTypist the typist whose lane to print
      * @param justMistyped whether to show the [<] indicator for a recent mistype
@@ -332,4 +337,5 @@ public class TypingRace
             i = i + 1;
         }
     }
+
 }

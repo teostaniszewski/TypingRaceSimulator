@@ -26,6 +26,9 @@ public class TypingRaceGUI
     private JLabel typingStyleImpactLabel;
     private JComboBox<String> keyboardTypeComboBox;
     private JLabel keyboardTypeImpactLabel;
+    private JTextField symbolField;
+    private JComboBox<String> colourComboBox;
+    private JLabel symbolColourImpactLabel;
 
     private String selectedPassage;
 
@@ -225,14 +228,49 @@ public class TypingRaceGUI
         stylePanel.add(typingStyleImpactLabel);
 
         panel.add(stylePanel, BorderLayout.NORTH);
-        JPanel customisationOptionsPanel = new JPanel(new GridLayout(2, 1, 10, 10));
+        JPanel customisationOptionsPanel = new JPanel(new GridLayout(3, 1, 10, 10));
         customisationOptionsPanel.add(stylePanel);
         customisationOptionsPanel.add(createKeyboardTypePanel());
+        customisationOptionsPanel.add(createSymbolColourPanel());
 
         panel.add(customisationOptionsPanel, BorderLayout.NORTH);
 
         return panel;
     }
+
+    /**
+ * Creates the symbol and colour customisation section.
+ *
+ * @return the symbol and colour panel
+ */
+private JPanel createSymbolColourPanel()
+{
+    JPanel panel = new JPanel(new GridLayout(4, 2, 5, 5));
+    panel.setBorder(BorderFactory.createTitledBorder("Symbol and Colour"));
+
+    symbolField = new JTextField("1", 3);
+
+    String[] colours = {
+        "Red",
+        "Blue",
+        "Green",
+        "Purple",
+        "Orange",
+        "Black"
+    };
+
+    colourComboBox = new JComboBox<>(colours);
+    symbolColourImpactLabel = new JLabel("Impact: Visual customisation only.");
+
+    panel.add(new JLabel("Typist symbol:"));
+    panel.add(symbolField);
+    panel.add(new JLabel("Progress colour:"));
+    panel.add(colourComboBox);
+    panel.add(new JLabel("Effect:"));
+    panel.add(symbolColourImpactLabel);
+
+    return panel;
+}
 
     /**
      * Creates the keyboard type customisation section.
@@ -287,7 +325,7 @@ public class TypingRaceGUI
             keyboardTypeImpactLabel.setText("Impact: Very fast typing, but harder to control.");
         }
     }
-    
+
     /**
      * Updates the description of how the selected typing style affects performance.
      */

@@ -24,6 +24,8 @@ public class TypingRaceGUI
     private JCheckBox nightShiftCheckBox;
     private JComboBox<String> typingStyleComboBox;
     private JLabel typingStyleImpactLabel;
+    private JComboBox<String> keyboardTypeComboBox;
+    private JLabel keyboardTypeImpactLabel;
 
     private String selectedPassage;
 
@@ -223,10 +225,69 @@ public class TypingRaceGUI
         stylePanel.add(typingStyleImpactLabel);
 
         panel.add(stylePanel, BorderLayout.NORTH);
+        JPanel customisationOptionsPanel = new JPanel(new GridLayout(2, 1, 10, 10));
+        customisationOptionsPanel.add(stylePanel);
+        customisationOptionsPanel.add(createKeyboardTypePanel());
+
+        panel.add(customisationOptionsPanel, BorderLayout.NORTH);
 
         return panel;
     }
 
+    /**
+     * Creates the keyboard type customisation section.
+     *
+     * @return the keyboard type panel
+     */
+    private JPanel createKeyboardTypePanel()
+    {
+        JPanel panel = new JPanel(new GridLayout(3, 1, 5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("Keyboard Type"));
+
+        String[] keyboardTypes = {
+            "Mechanical",
+            "Membrane",
+            "Touchscreen",
+            "Stenography"
+        };
+
+        keyboardTypeComboBox = new JComboBox<>(keyboardTypes);
+        keyboardTypeImpactLabel = new JLabel("Impact: Mechanical keyboard gives steady typing performance.");
+
+        keyboardTypeComboBox.addActionListener(e -> updateKeyboardTypeImpact());
+
+        panel.add(new JLabel("Choose keyboard type:"));
+        panel.add(keyboardTypeComboBox);
+        panel.add(keyboardTypeImpactLabel);
+
+        return panel;
+    }
+
+    /**
+     * Updates the description of how the selected keyboard type affects performance.
+     */
+    private void updateKeyboardTypeImpact()
+    {
+        String selectedKeyboard = (String) keyboardTypeComboBox.getSelectedItem();
+
+        if ("Mechanical".equals(selectedKeyboard))
+        {
+            keyboardTypeImpactLabel.setText("Impact: Steady typing performance.");
+        }
+        else if ("Membrane".equals(selectedKeyboard))
+        {
+            keyboardTypeImpactLabel.setText("Impact: Slightly lower speed, but stable accuracy.");
+        }
+        else if ("Touchscreen".equals(selectedKeyboard))
+        {
+            keyboardTypeImpactLabel.setText("Impact: Higher mistype chance.");
+        }
+        else if ("Stenography".equals(selectedKeyboard))
+        {
+            keyboardTypeImpactLabel.setText("Impact: Very fast typing, but harder to control.");
+        }
+    }
+    
     /**
      * Updates the description of how the selected typing style affects performance.
      */

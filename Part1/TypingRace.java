@@ -19,6 +19,10 @@ public class TypingRace
     private Typist seat1Typist;
     private Typist seat2Typist;
     private Typist seat3Typist;
+    
+    private boolean seat1JustMistyped;
+    private boolean seat2JustMistyped;
+    private boolean seat3JustMistyped;
 
     // Accuracy thresholds for mistype and burnout events
     // (Ty tuned these values "by feel". They may need adjustment.)
@@ -39,6 +43,9 @@ public class TypingRace
         seat1Typist = null;
         seat2Typist = null;
         seat3Typist = null;
+        seat1JustMistyped = false;
+        seat2JustMistyped = false;
+        seat3JustMistyped = false;
     }
 
     /**
@@ -93,10 +100,14 @@ public class TypingRace
 
         while (!finished)
         {
+            seat1JustMistyped = false;
+            seat2JustMistyped = false;
+            seat3JustMistyped = false;
+
             // Advance each typist by one turn
-            advanceTypist(seat1Typist);
-            advanceTypist(seat2Typist);
-            advanceTypist(seat3Typist);
+            advanceTypist(seat1Typist, 1);
+            advanceTypist(seat2Typist, 2);
+            advanceTypist(seat3Typist, 3);
 
             // Print the current state of the race
             printRace();
@@ -144,8 +155,9 @@ public class TypingRace
      *     who are pushing themselves too hard.
      *
      * @param theTypist the typist to advance
+     * @param seatNumber the seat number (1–3) of the typist
      */
-    private void advanceTypist(Typist theTypist)
+    private void advanceTypist(Typist theTypist, int seatNumber)
     {
         if (theTypist == null)
         {
@@ -169,6 +181,7 @@ public class TypingRace
         if (Math.random() < (1.0 - theTypist.getAccuracy()) * MISTYPE_BASE_CHANCE)
         {
             theTypist.slideBack(SLIDE_BACK_AMOUNT);
+            markMistyped(seatNumber);
         }
 
         // Burnout check — pushing too hard increases burnout risk
@@ -196,6 +209,28 @@ public class TypingRace
     }
 
     /**
+     * Marks that a typist in a given seat has just mistyped during this turn.
+     * This is used to display the [<] indicator in the race output.
+     *
+     * @param seatNumber the seat number of the typist (1–3)
+     */
+    private void markMistyped(int seatNumber)
+    {
+        if (seatNumber == 1)
+        {
+            seat1JustMistyped = true;
+        }
+        else if (seatNumber == 2)
+        {
+            seat2JustMistyped = true;
+        }
+        else if (seatNumber == 3)
+        {
+            seat3JustMistyped = true;
+        }
+    }
+
+    /**
      * Prints the current state of the race to the terminal.
      * Shows each typist's position along the passage, burnout state,
      * and a WPM estimate based on current progress.
@@ -208,13 +243,13 @@ public class TypingRace
         multiplePrint('=', passageLength + 3);
         System.out.println();
 
-        printSeat(seat1Typist);
+        printSeat(seat1Typist, seat1JustMistyped);
         System.out.println();
 
-        printSeat(seat2Typist);
+        printSeat(seat2Typist, seat2JustMistyped);
         System.out.println();
 
-        printSeat(seat3Typist);
+        printSeat(seat3Typist, seat3JustMistyped);
         System.out.println();
 
         multiplePrint('=', passageLength + 3);
@@ -229,12 +264,10 @@ public class TypingRace
      *   |          ⌨           | TURBOFINGERS (Accuracy: 0.85)
      *   |    [zz]              | HUNT_N_PECK  (Accuracy: 0.40) BURNT OUT (2 turns)
      *
-     * Note: Ty forgot to show when a typist has just mistyped. That would
-     * be a nice improvement — perhaps a [<] marker after their symbol.
-     *
      * @param theTypist the typist whose lane to print
+     * @param justMistyped whether to show the [<] indicator for a recent mistype
      */
-    private void printSeat(Typist theTypist)
+    private void printSeat(Typist theTypist, boolean justMistyped)
     {
         if (theTypist == null)
         {
@@ -253,6 +286,12 @@ public class TypingRace
         {
             System.out.print('~');
             spacesAfter--; // symbol + ~ together take two characters
+        }
+
+        if (justMistyped)
+        {
+            System.out.print("[<]");
+            spacesAfter = spacesAfter - 3;
         }
 
         multiplePrint(' ', spacesAfter);

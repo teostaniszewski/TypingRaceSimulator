@@ -614,6 +614,53 @@ public class TypingRaceGUI
     }
 
     /**
+     * Builds a comparison view for two selected typists.
+     *
+     * @param firstIndex the first typist index
+     * @param secondIndex the second typist index
+     * @return formatted comparison statistics
+     */
+    private String buildComparisonText(int firstIndex, int secondIndex)
+    {
+        if (currentTypists == null)
+        {
+            return "No comparison data available yet.\n\nRun a race first.";
+        }
+
+        if (firstIndex >= currentTypists.length || secondIndex >= currentTypists.length)
+        {
+            return "One or both selected typists did not take part in the last race.";
+        }
+
+        if (firstIndex == secondIndex)
+        {
+            return "Please choose two different typists to compare.";
+        }
+
+        return "Comparison View:\n\n"
+            + buildSingleTypistComparison(firstIndex)
+            + "\n------------------------------\n\n"
+            + buildSingleTypistComparison(secondIndex);
+    }
+
+    /**
+     * Builds comparison text for one typist.
+     *
+     * @param index the typist index
+     * @return formatted typist comparison text
+     */
+    private String buildSingleTypistComparison(int index)
+    {
+        return currentTypists[index].getName()
+            + "\nProgress: " + currentTypists[index].getProgress() + " / " + selectedPassage.length()
+            + "\nMistypes: " + mistypeCounts[index]
+            + "\nBurnouts: " + burnoutCounts[index]
+            + "\nStarting accuracy: " + String.format("%.2f", startingAccuracies[index])
+            + "\nFinal accuracy: " + String.format("%.2f", finalAccuracies[index])
+            + "\nAccuracy change: " + String.format("%.2f", finalAccuracies[index] - startingAccuracies[index]);
+    }
+
+    /**
      * Builds the race statistics text.
      *
      * @return formatted race statistics
@@ -676,7 +723,7 @@ public class TypingRaceGUI
         statsTabs.addTab("Last Race", createStatsTextPanel(lastRaceStats));
         statsTabs.addTab("Personal Bests", createStatsTextPanel(buildPersonalBestsText()));
         statsTabs.addTab("Race History", createStatsTextPanel(raceHistoryText));
-        statsTabs.addTab("Comparison", createStatsTextPanel("Comparison view will be added here."));
+        statsTabs.addTab("Comparison", createComparisonPanel());
         statsTabs.addTab("Charts", createStatsTextPanel("Graphical display will be added here."));
 
         panel.add(statsTabs, BorderLayout.CENTER);
@@ -722,6 +769,97 @@ public class TypingRaceGUI
         panel.add(new JScrollPane(textArea), BorderLayout.CENTER);
 
         return panel;
+    }
+
+    /**
+     * Creates a comparison panel where two typists can be selected and compared.
+     *
+     * @return the comparison panel
+     */
+    private JPanel createComparisonPanel()
+    {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JPanel selectionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        JComboBox<String> firstTypistBox = new JComboBox<>(typistNames);
+        JComboBox<String> secondTypistBox = new JComboBox<>(typistNames);
+
+        firstTypistBox.setSelectedIndex(0);
+        secondTypistBox.setSelectedIndex(1);
+
+        JTextArea comparisonArea = new JTextArea();
+        comparisonArea.setEditable(false);
+
+        JButton compareButton = new JButton("Compare");
+        compareButton.addActionListener(e -> {
+            int firstIndex = firstTypistBox.getSelectedIndex();
+            int secondIndex = secondTypistBox.getSelectedIndex();
+
+            if (firstIndex == secondIndex)
+            {
+                JOptionPane.showMessageDialog(panel,
+                    "Please select two different typists.",
+                    "Invalid Selection",
+                    JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            comparisonArea.setText(buildComparisonText(firstIndex, secondIndex));
+        });
+
+        selectionPanel.add(new JLabel("Typist 1:"));
+        selectionPanel.add(firstTypistBox);
+        selectionPanel.add(new JLabel("Typist 2:"));
+        selectionPanel.add(secondTypistBox);
+        selectionPanel.add(compareButton);
+
+        firstTypistBox.addActionListener(e ->
+            updateComparisonDropdown(firstTypistBox, secondTypistBox)
+        );
+
+        secondTypistBox.addActionListener(e ->
+            updateComparisonDropdown(secondTypistBox, firstTypistBox)
+        );
+
+        updateComparisonDropdown(firstTypistBox, secondTypistBox);
+
+        comparisonArea.setText(buildComparisonText(0, 1));
+
+        panel.add(selectionPanel, BorderLayout.NORTH);
+        panel.add(new JScrollPane(comparisonArea), BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    /**
+     * Updates a dropdown so it excludes the selected value of the other dropdown.
+     */
+    private void updateComparisonDropdown(JComboBox<String> source, JComboBox<String> target)
+    {
+        String selected = (String) source.getSelectedItem();
+        String currentTargetSelection = (String) target.getSelectedItem();
+
+        target.removeAllItems();
+
+        for (String name : typistNames)
+        {
+            if (!name.equals(selected))
+            {
+                target.addItem(name);
+            }
+        }
+
+        // restore selection if still valid
+        if (currentTargetSelection != null && !currentTargetSelection.equals(selected))
+        {
+            target.setSelectedItem(currentTargetSelection);
+        }
+        else
+        {
+            target.setSelectedIndex(0);
+        }
     }
 
     /**

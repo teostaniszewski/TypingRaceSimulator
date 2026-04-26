@@ -280,12 +280,54 @@ public class TypingRaceGUI
 
         racePanel.add(titleLabel, BorderLayout.NORTH);
         racePanel.add(lanesPanel, BorderLayout.CENTER);
+        racePanel.add(createRaceButtonPanel(), BorderLayout.SOUTH);
 
         frame.setContentPane(racePanel);
         frame.revalidate();
         frame.repaint();
 
         startRaceAnimation();
+    }
+
+    /**
+     * Creates buttons shown on the race screen.
+     *
+     * @return the race button panel
+     */
+    private JPanel createRaceButtonPanel()
+    {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        JButton viewStatsButton = new JButton("View Stats");
+        viewStatsButton.addActionListener(e -> JOptionPane.showMessageDialog(frame,
+            "Stats will be added later.",
+            "Stats",
+            JOptionPane.INFORMATION_MESSAGE));
+
+        JButton backButton = new JButton("Back to Menu");
+        backButton.addActionListener(e -> showSetupScreen());
+
+        panel.add(viewStatsButton);
+        panel.add(backButton);
+
+        return panel;
+    }
+
+    /**
+    * Returns the user back to the configuration and customisation menu.
+    */
+    private void showSetupScreen()
+    {
+        if (raceTimer != null)
+        {
+            raceTimer.stop();
+        }
+
+        frame.getContentPane().removeAll();
+        createWindow();
+
+        frame.revalidate();
+        frame.repaint();
     }
 
     /**
@@ -320,7 +362,7 @@ public class TypingRaceGUI
      */
     private void startRaceAnimation()
     {
-        raceTimer = new Timer(250, e -> runRaceTurn());
+        raceTimer = new Timer(450, e -> runRaceTurn());
         raceTimer.start();
     }
 
@@ -405,6 +447,7 @@ public class TypingRaceGUI
     /**
      * Updates the visible passage text for one typist.
      * Typed text is highlighted using the typist's selected colour.
+     * The current character is highlighted in yellow.
      *
      * @param index the index of the typist
      */
@@ -428,12 +471,21 @@ public class TypingRaceGUI
             StyleConstants.setForeground(typedStyle, getSelectedColour(index));
             StyleConstants.setBold(typedStyle, true);
 
+            SimpleAttributeSet currentStyle = new SimpleAttributeSet();
+            StyleConstants.setBackground(currentStyle, Color.YELLOW);
+            StyleConstants.setForeground(currentStyle, Color.BLACK);
+            StyleConstants.setBold(currentStyle, true);
+
             SimpleAttributeSet remainingStyle = new SimpleAttributeSet();
             StyleConstants.setForeground(remainingStyle, Color.BLACK);
 
             doc.insertString(doc.getLength(), selectedPassage.substring(0, progress), typedStyle);
-            doc.insertString(doc.getLength(), "|", remainingStyle);
-            doc.insertString(doc.getLength(), selectedPassage.substring(progress), remainingStyle);
+
+            if (progress < selectedPassage.length())
+            {
+                doc.insertString(doc.getLength(), selectedPassage.substring(progress, progress + 1), currentStyle);
+                doc.insertString(doc.getLength(), selectedPassage.substring(progress + 1), remainingStyle);
+            }
         }
         catch (BadLocationException e)
         {

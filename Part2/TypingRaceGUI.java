@@ -54,7 +54,7 @@ public class TypingRaceGUI
     {
         frame = new JFrame("Typing Race Simulator");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(800, 600);
+        frame.setSize(1250, 750);
         frame.setLocationRelativeTo(null);
 
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
@@ -166,6 +166,7 @@ public class TypingRaceGUI
         seatCountSpinner.setPreferredSize(new Dimension(60, 28));
 
         JSpinner.DefaultEditor editor = (JSpinner.DefaultEditor) seatCountSpinner.getEditor();
+        editor.getTextField().setEditable(false);
         editor.getTextField().setHorizontalAlignment(JTextField.CENTER);
 
         panel.add(label);
@@ -244,38 +245,35 @@ public class TypingRaceGUI
     }
 
     /**
- * Creates the symbol and colour customisation section.
- *
- * @return the symbol and colour panel
- */
-private JPanel createSymbolColourPanel()
-{
-    JPanel panel = new JPanel(new GridLayout(4, 2, 5, 5));
-    panel.setBorder(BorderFactory.createTitledBorder("Symbol and Colour"));
+     * Creates the symbol and colour customisation section.
+     *
+     * @return the symbol and colour panel
+     */
+    private JPanel createSymbolColourPanel()
+    {
+        JPanel panel = new JPanel(new GridLayout(4, 2, 5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("Symbol and Colour"));
 
-    symbolField = new JTextField("1", 3);
+        symbolField = new JTextField("1", 3);
 
-    String[] colours = {
-        "Red",
-        "Blue",
-        "Green",
-        "Purple",
-        "Orange",
-        "Black"
-    };
+        String[] colours = {
+            "Red",
+            "Blue",
+            "Green",
+            "Purple",
+            "Orange",
+            "Black"
+        };
 
-    colourComboBox = new JComboBox<>(colours);
-    symbolColourImpactLabel = new JLabel("Impact: Visual customisation only.");
+        colourComboBox = new JComboBox<>(colours);
 
-    panel.add(new JLabel("Typist symbol:"));
-    panel.add(symbolField);
-    panel.add(new JLabel("Progress colour:"));
-    panel.add(colourComboBox);
-    panel.add(new JLabel("Effect:"));
-    panel.add(symbolColourImpactLabel);
+        panel.add(new JLabel("Typist symbol:"));
+        panel.add(symbolField);
+        panel.add(new JLabel("Progress colour:"));
+        panel.add(colourComboBox);
 
-    return panel;
-}
+        return panel;
+    }
 
     /**
      * Creates the keyboard type customisation section.
@@ -320,16 +318,16 @@ private JPanel createSymbolColourPanel()
         energyDrinkCheckBox = new JCheckBox("Energy Drink - boosts accuracy early, reduces later");
         noiseCancellingCheckBox = new JCheckBox("Noise-Cancelling Headphones - reduces mistype chance");
 
-        accessoryImpactLabel = new JLabel("Impact: Accessories affect typing performance.");
-
         wristSupportCheckBox.addActionListener(e -> updateAccessoryImpact());
         energyDrinkCheckBox.addActionListener(e -> updateAccessoryImpact());
         noiseCancellingCheckBox.addActionListener(e -> updateAccessoryImpact());
+        JButton applyAccessoriesButton = new JButton("Apply Accessory Effects");
+        applyAccessoriesButton.addActionListener(e -> applyAccessoryEffects());
 
         panel.add(wristSupportCheckBox);
         panel.add(energyDrinkCheckBox);
         panel.add(noiseCancellingCheckBox);
-        panel.add(accessoryImpactLabel);
+        panel.add(applyAccessoriesButton);
 
         return panel;
     }
@@ -436,6 +434,39 @@ private JPanel createSymbolColourPanel()
         }
 
         passageLengthLabel.setText("Passage length: " + selectedPassage.length() + " characters");
+    }
+
+    /**
+     * Calculates and displays the effects of selected accessories.
+     */
+    private void applyAccessoryEffects()
+    {
+        int burnoutDurationChange = 0;
+        double accuracyChange = 0.0;
+        double mistypeChanceChange = 0.0;
+
+        if (wristSupportCheckBox.isSelected())
+        {
+            burnoutDurationChange = burnoutDurationChange - 1;
+        }
+
+        if (energyDrinkCheckBox.isSelected())
+        {
+            accuracyChange = accuracyChange + 0.05;
+        }
+
+        if (noiseCancellingCheckBox.isSelected())
+        {
+            mistypeChanceChange = mistypeChanceChange - 0.05;
+        }
+
+        JOptionPane.showMessageDialog(frame,
+            "Accessory effects applied:\n"
+            + "Burnout duration change: " + burnoutDurationChange + "\n"
+            + "Accuracy change: " + accuracyChange + "\n"
+            + "Mistype chance change: " + mistypeChanceChange,
+            "Accessory Effects",
+            JOptionPane.INFORMATION_MESSAGE);
     }
 
     /**

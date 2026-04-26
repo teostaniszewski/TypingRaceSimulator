@@ -79,7 +79,7 @@ public class TypingRaceGUI
     public TypingRaceGUI()
     {
         selectedPassage = "";
-        lastRaceStats = "No race statistics available yet.";
+        lastRaceStats = "No race has been run yet.\n\nStart a race to see statistics here.";
         updatingSymbols = false;
         createWindow();
     }
@@ -627,6 +627,7 @@ public class TypingRaceGUI
 
     /**
      * Creates the statistics tab.
+     * This contains separate tabs for summary, personal bests, history, comparison, and charts.
      *
      * @return the stats panel
      */
@@ -635,12 +636,35 @@ public class TypingRaceGUI
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        JTextArea statsArea = new JTextArea(lastRaceStats);
-        statsArea.setEditable(false);
-        statsArea.setLineWrap(true);
-        statsArea.setWrapStyleWord(true);
+        JTabbedPane statsTabs = new JTabbedPane();
 
-        panel.add(new JScrollPane(statsArea), BorderLayout.CENTER);
+        statsTabs.addTab("Last Race", createStatsTextPanel(lastRaceStats));
+        statsTabs.addTab("Personal Bests", createStatsTextPanel("Personal best WPM records will appear here."));
+        statsTabs.addTab("Race History", createStatsTextPanel("Full race history will appear here."));
+        statsTabs.addTab("Comparison", createStatsTextPanel("Comparison view will be added here."));
+        statsTabs.addTab("Charts", createStatsTextPanel("Graphical display will be added here."));
+
+        panel.add(statsTabs, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    /**
+     * Creates a simple scrollable text panel for a statistics section.
+     *
+     * @param text the text to display
+     * @return the text statistics panel
+     */
+    private JPanel createStatsTextPanel(String text)
+    {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JTextArea textArea = new JTextArea(text);
+        textArea.setEditable(false);
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+
+        panel.add(new JScrollPane(textArea), BorderLayout.CENTER);
 
         return panel;
     }

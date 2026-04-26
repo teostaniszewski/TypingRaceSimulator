@@ -50,8 +50,11 @@ public class TypingRaceGUI
 
     private int[] mistypeCounts;
     private int[] burnoutCounts;
+
     private double[] startingAccuracies;
     private double[] finalAccuracies;
+    private double[] bestWpmRecords;
+
     private long raceStartTime;
     private String lastRaceStats;
 
@@ -80,6 +83,7 @@ public class TypingRaceGUI
     {
         selectedPassage = "";
         lastRaceStats = "No race has been run yet.\n\nStart a race to see statistics here.";
+        bestWpmRecords = new double[typistNames.length];
         updatingSymbols = false;
         createWindow();
     }
@@ -603,6 +607,11 @@ public class TypingRaceGUI
                 wpm = wordsTyped / elapsedMinutes;
             }
 
+            if (wpm > bestWpmRecords[i])
+            {
+                bestWpmRecords[i] = wpm;
+            }
+
             int totalAttempts = currentTypists[i].getProgress() + mistypeCounts[i];
             double accuracyPercent = 100.0;
 
@@ -639,7 +648,7 @@ public class TypingRaceGUI
         JTabbedPane statsTabs = new JTabbedPane();
 
         statsTabs.addTab("Last Race", createStatsTextPanel(lastRaceStats));
-        statsTabs.addTab("Personal Bests", createStatsTextPanel("Personal best WPM records will appear here."));
+        statsTabs.addTab("Personal Bests", createStatsTextPanel(buildPersonalBestsText()));
         statsTabs.addTab("Race History", createStatsTextPanel("Full race history will appear here."));
         statsTabs.addTab("Comparison", createStatsTextPanel("Comparison view will be added here."));
         statsTabs.addTab("Charts", createStatsTextPanel("Graphical display will be added here."));
@@ -647,6 +656,26 @@ public class TypingRaceGUI
         panel.add(statsTabs, BorderLayout.CENTER);
 
         return panel;
+    }
+
+    /**
+     * Builds the personal best WPM statistics text.
+     *
+     * @return formatted personal best statistics
+     */
+    private String buildPersonalBestsText()
+    {
+        String text = "Personal Bests:\n\n";
+
+        for (int i = 0; i < typistNames.length; i++)
+        {
+            text += typistNames[i]
+                + " - Best WPM: "
+                + String.format("%.2f", bestWpmRecords[i])
+                + "\n";
+        }
+
+        return text;
     }
 
     /**

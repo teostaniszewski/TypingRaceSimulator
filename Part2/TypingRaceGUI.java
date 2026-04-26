@@ -2,7 +2,6 @@ package Part2;
 
 import javax.swing.*;
 import java.awt.*;
-import Part1.Typist;
 
 /**
  * Graphical user interface for the Typing Race Simulator.
@@ -244,7 +243,8 @@ public class TypingRaceGUI
     private void previewRaceConfiguration()
     {
         int seatCount = (Integer) seatCountSpinner.getValue();
-
+        Typist[] typists = createTypistsFromGUI();
+        
         String message = "Race configuration:\n\n"
             + "Passage length: " + selectedPassage.length() + " characters\n"
             + "Number of racers: " + seatCount + "\n"
@@ -263,7 +263,6 @@ public class TypingRaceGUI
                 + "\n";
         }
 
-        Typist[] typists = createTypistsFromGUI();
         JOptionPane.showMessageDialog(frame, message, "Race Preview", JOptionPane.INFORMATION_MESSAGE);
     }
 

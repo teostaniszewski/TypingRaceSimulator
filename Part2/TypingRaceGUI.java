@@ -43,9 +43,17 @@ public class TypingRaceGUI
     private JLabel passageLengthLabel;
 
     private JButton startRaceButton;
+    private JButton viewStatsButton;
 
     private boolean updatingSymbols;
     private String selectedPassage;
+
+    private int[] mistypeCounts;
+    private int[] burnoutCounts;
+    private double[] startingAccuracies;
+    private double[] finalAccuracies;
+    private long raceStartTime;
+    private String lastRaceStats;
 
     private static final double MISTYPE_BASE_CHANCE = 0.30;
     private static final int SLIDE_BACK_AMOUNT = 2;
@@ -71,13 +79,13 @@ public class TypingRaceGUI
     public TypingRaceGUI()
     {
         selectedPassage = "";
+        lastRaceStats = "No race statistics available yet.";
         updatingSymbols = false;
         createWindow();
     }
 
     /**
-     * Creates the main application window and layout.
-     * Adds the tabbed GUI structure.
+     * Creates the main application window.
      */
     private void createWindow()
     {
@@ -86,6 +94,17 @@ public class TypingRaceGUI
         frame.setSize(1250, 750);
         frame.setLocationRelativeTo(null);
 
+        frame.add(createMainPanel());
+        frame.setVisible(true);
+    }
+
+    /**
+     * Creates the main setup panel containing configuration, customisation, and stats tabs.
+     *
+     * @return the main setup panel
+     */
+    private JPanel createMainPanel()
+    {
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
@@ -95,12 +114,12 @@ public class TypingRaceGUI
         JTabbedPane tabbedPane = new JTabbedPane();
         tabbedPane.addTab("Race Configuration", createRaceConfigurationPanel());
         tabbedPane.addTab("Customise Typists", createCustomiseTypistsPanel());
+        tabbedPane.addTab("Stats", createStatsPanel());
 
         mainPanel.add(titleLabel, BorderLayout.NORTH);
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
 
-        frame.add(mainPanel);
-        frame.setVisible(true);
+        return mainPanel;
     }
 
     /**
@@ -265,6 +284,17 @@ public class TypingRaceGUI
         raceStatusLabels = new JLabel[currentTypists.length];
         justMistyped = new boolean[currentTypists.length];
 
+        mistypeCounts = new int[currentTypists.length];
+        burnoutCounts = new int[currentTypists.length];
+        startingAccuracies = new double[currentTypists.length];
+        finalAccuracies = new double[currentTypists.length];
+        raceStartTime = System.currentTimeMillis();
+
+        for (int i = 0; i < currentTypists.length; i++)
+        {
+            startingAccuracies[i] = currentTypists[i].getAccuracy();
+        }
+
         JPanel racePanel = new JPanel(new BorderLayout(10, 10));
         racePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -298,11 +328,9 @@ public class TypingRaceGUI
     {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
-        JButton viewStatsButton = new JButton("View Stats");
-        viewStatsButton.addActionListener(e -> JOptionPane.showMessageDialog(frame,
-            "Stats will be added later.",
-            "Stats",
-            JOptionPane.INFORMATION_MESSAGE));
+        viewStatsButton = new JButton("View Stats");
+        viewStatsButton.setEnabled(false);
+        viewStatsButton.addActionListener(e -> showStatsWindow());
 
         JButton backButton = new JButton("Back to Menu");
         backButton.addActionListener(e -> showSetupScreen());
@@ -314,8 +342,8 @@ public class TypingRaceGUI
     }
 
     /**
-    * Returns the user back to the configuration and customisation menu.
-    */
+     * Returns the user back to the configuration and customisation menu.
+     */
     private void showSetupScreen()
     {
         if (raceTimer != null)
@@ -323,9 +351,7 @@ public class TypingRaceGUI
             raceTimer.stop();
         }
 
-        frame.getContentPane().removeAll();
-        createWindow();
-
+        frame.setContentPane(createMainPanel());
         frame.revalidate();
         frame.repaint();
     }
@@ -341,7 +367,10 @@ public class TypingRaceGUI
     {
         JPanel lanePanel = new JPanel(new BorderLayout(10, 10));
         String hex = toHex(getSelectedColourSafe(index));
-        lanePanel.setBorder(BorderFactory.createTitledBorder("<html><font color='" + hex + "'>" + typist.getSymbol() + "</font> " + typist.getName() + "</html>"));
+
+        lanePanel.setBorder(BorderFactory.createTitledBorder(
+            "<html><font color='" + hex + "'>" + typist.getSymbol() + "</font> " + typist.getName() + "</html>"
+        ));
 
         JTextPane passagePane = new JTextPane();
         passagePane.setEditable(false);
@@ -393,7 +422,12 @@ public class TypingRaceGUI
 
             if (noiseCancellingBoxes[i].isSelected())
             {
-                mistypeChance -= 0.05;
+                mistypeChance = mistypeChance - 0.05;
+            }
+
+            if (mistypeChance < 0.0)
+            {
+                mistypeChance = 0.0;
             }
 
             if (Math.random() < mistypeChance)
@@ -407,6 +441,7 @@ public class TypingRaceGUI
 
                 typist.slideBack(slideBackAmount);
                 justMistyped[i] = true;
+                mistypeCounts[i]++;
             }
 
             if (Math.random() < 0.05 * typist.getAccuracy() * typist.getAccuracy())
@@ -419,6 +454,7 @@ public class TypingRaceGUI
                 }
 
                 typist.burnOut(burnoutDuration);
+                burnoutCounts[i]++;
                 typist.setAccuracy(typist.getAccuracy() - 0.01);
             }
 
@@ -427,20 +463,42 @@ public class TypingRaceGUI
 
             if (typist.getProgress() >= selectedPassage.length())
             {
-                raceTimer.stop();
-
-                double oldAccuracy = typist.getAccuracy();
-                typist.setAccuracy(oldAccuracy + 0.02);
-
-                JOptionPane.showMessageDialog(frame,
-                    "And the winner is... " + typist.getName() + "!\n"
-                    + "Final accuracy: " + String.format("%.2f", typist.getAccuracy())
-                    + " (improved from " + String.format("%.2f", oldAccuracy) + ")",
-                    "Race Finished",
-                    JOptionPane.INFORMATION_MESSAGE);
+                finishRace(typist);
                 return;
             }
         }
+    }
+
+    /**
+     * Finishes the race, stores final statistics, and enables the stats button.
+     *
+     * @param winner the winning typist
+     */
+    private void finishRace(Typist winner)
+    {
+        raceTimer.stop();
+
+        double oldAccuracy = winner.getAccuracy();
+        winner.setAccuracy(oldAccuracy + 0.02);
+
+        for (int i = 0; i < currentTypists.length; i++)
+        {
+            finalAccuracies[i] = currentTypists[i].getAccuracy();
+        }
+
+        lastRaceStats = buildStatsText();
+
+        if (viewStatsButton != null)
+        {
+            viewStatsButton.setEnabled(true);
+        }
+
+        JOptionPane.showMessageDialog(frame,
+            "And the winner is... " + winner.getName() + "!\n"
+            + "Final accuracy: " + String.format("%.2f", winner.getAccuracy())
+            + " (improved from " + String.format("%.2f", oldAccuracy) + ")",
+            "Race Finished",
+            JOptionPane.INFORMATION_MESSAGE);
     }
 
     /**
@@ -518,6 +576,76 @@ public class TypingRaceGUI
     }
 
     /**
+     * Displays race statistics for all typists.
+     */
+    private void showStatsWindow()
+    {
+        JOptionPane.showMessageDialog(frame, lastRaceStats, "Stats", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /**
+     * Builds the race statistics text.
+     *
+     * @return formatted race statistics
+     */
+    private String buildStatsText()
+    {
+        double elapsedMinutes = (System.currentTimeMillis() - raceStartTime) / 60000.0;
+        String stats = "Race Statistics:\n\n";
+
+        for (int i = 0; i < currentTypists.length; i++)
+        {
+            double wordsTyped = currentTypists[i].getProgress() / 5.0;
+            double wpm = 0.0;
+
+            if (elapsedMinutes > 0)
+            {
+                wpm = wordsTyped / elapsedMinutes;
+            }
+
+            int totalAttempts = currentTypists[i].getProgress() + mistypeCounts[i];
+            double accuracyPercent = 100.0;
+
+            if (totalAttempts > 0)
+            {
+                accuracyPercent = ((double) currentTypists[i].getProgress() / totalAttempts) * 100.0;
+            }
+
+            stats += currentTypists[i].getName()
+                + "\nWPM: " + String.format("%.2f", wpm)
+                + "\nAccuracy percentage: " + String.format("%.2f", accuracyPercent) + "%"
+                + "\nMistypes: " + mistypeCounts[i]
+                + "\nBurnouts: " + burnoutCounts[i]
+                + "\nStarting accuracy: " + String.format("%.2f", startingAccuracies[i])
+                + "\nFinal accuracy: " + String.format("%.2f", finalAccuracies[i])
+                + "\nAccuracy change: " + String.format("%.2f", finalAccuracies[i] - startingAccuracies[i])
+                + "\n\n";
+        }
+
+        return stats;
+    }
+
+    /**
+     * Creates the statistics tab.
+     *
+     * @return the stats panel
+     */
+    private JPanel createStatsPanel()
+    {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JTextArea statsArea = new JTextArea(lastRaceStats);
+        statsArea.setEditable(false);
+        statsArea.setLineWrap(true);
+        statsArea.setWrapStyleWord(true);
+
+        panel.add(new JScrollPane(statsArea), BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    /**
      * Gets the selected colour for a typist.
      *
      * @param index the index of the typist
@@ -549,6 +677,37 @@ public class TypingRaceGUI
         }
 
         return Color.BLACK;
+    }
+
+    /**
+     * Safely gets the selected colour for a typist.
+     * This prevents errors if the colour dropdown has not been created yet.
+     *
+     * @param index the index of the typist
+     * @return the selected colour, or black as a fallback
+     */
+    private Color getSelectedColourSafe(int index)
+    {
+        if (colourBoxes == null || colourBoxes[index] == null)
+        {
+            return Color.BLACK;
+        }
+
+        return getSelectedColour(index);
+    }
+
+    /**
+     * Converts a Color object into a hex colour string for HTML text.
+     *
+     * @param color the colour to convert
+     * @return the colour as a hex string
+     */
+    private String toHex(Color color)
+    {
+        return String.format("#%02x%02x%02x",
+            color.getRed(),
+            color.getGreen(),
+            color.getBlue());
     }
 
     /**
@@ -597,8 +756,11 @@ public class TypingRaceGUI
         for (int i = 0; i < count; i++)
         {
             String hex = toHex(getSelectedColourSafe(i));
-            typistTabbedPane.addTab("<html><font color='" + hex + "'>" + availableSymbols[i] + "</font> " + typistNames[i] + "</html>",
-            createSingleTypistPanel(i));
+
+            typistTabbedPane.addTab(
+                "<html><font color='" + hex + "'>" + availableSymbols[i] + "</font> " + typistNames[i] + "</html>",
+                createSingleTypistPanel(i)
+            );
         }
 
         updateSymbolAvailability();
@@ -654,67 +816,6 @@ public class TypingRaceGUI
         panel.add(impactLabel);
 
         return panel;
-    }
-
-    /**
-     * Builds Typist objects from the current GUI customisation choices.
-     *
-     * @return an array of Typist objects
-     */
-    private Typist[] createTypistsFromGUI()
-    {
-        int seatCount = (Integer) seatCountSpinner.getValue();
-        Typist[] typists = new Typist[seatCount];
-
-        for (int i = 0; i < seatCount; i++)
-        {
-            String name = typistNames[i];
-            String selectedSymbol = (String) symbolBoxes[i].getSelectedItem();
-            char symbol = selectedSymbol.charAt(0);
-
-            double accuracy = 0.70;
-
-            if ("Touch Typist".equals(typingStyleBoxes[i].getSelectedItem()))
-            {
-                accuracy = accuracy + 0.10;
-            }
-            else if ("Hunt & Peck".equals(typingStyleBoxes[i].getSelectedItem()))
-            {
-                accuracy = accuracy - 0.10;
-            }
-            else if ("Voice-to-Text".equals(typingStyleBoxes[i].getSelectedItem()))
-            {
-                accuracy = accuracy + 0.05;
-            }
-
-            if ("Mechanical".equals(keyboardTypeBoxes[i].getSelectedItem()))
-            {
-                accuracy = accuracy + 0.05;
-            }
-            else if ("Touchscreen".equals(keyboardTypeBoxes[i].getSelectedItem()))
-            {
-                accuracy = accuracy - 0.05;
-            }
-
-            if (nightShiftCheckBox.isSelected())
-            {
-                accuracy = accuracy - 0.05;
-            }
-
-            if (caffeineModeCheckBox.isSelected())
-            {
-                accuracy = accuracy + 0.03;
-            }
-
-            if (energyDrinkBoxes[i].isSelected())
-            {
-                accuracy = accuracy + 0.05;
-            }
-
-            typists[i] = new Typist(symbol, name, accuracy);
-        }
-
-        return typists;
     }
 
     /**
@@ -823,8 +924,12 @@ public class TypingRaceGUI
                 }
 
                 symbolBoxes[i].setSelectedItem(currentSymbol);
+
                 String hex = toHex(getSelectedColourSafe(i));
-                typistTabbedPane.setTitleAt(i,"<html><font color='" + hex + "'>" + currentSymbol + "</font> " + typistNames[i] + "</html>");
+
+                typistTabbedPane.setTitleAt(i,
+                    "<html><font color='" + hex + "'>" + currentSymbol + "</font> " + typistNames[i] + "</html>"
+                );
             }
         }
 
@@ -882,37 +987,6 @@ public class TypingRaceGUI
     }
 
     /**
-     * Safely gets the selected colour for a typist.
-     * This prevents errors if the colour dropdown has not been created yet.
-     *
-     * @param index the index of the typist
-     * @return the selected colour, or black as a fallback
-     */
-    private Color getSelectedColourSafe(int index)
-    {
-        if (colourBoxes == null || colourBoxes[index] == null)
-        {
-            return Color.BLACK;
-        }
-
-        return getSelectedColour(index);
-    }
-
-    /**
-     * Converts a Color object into a hex colour string for HTML text.
-     *
-     * @param color the colour to convert
-     * @return the colour as a hex string
-     */
-    private String toHex(Color color)
-    {
-        return String.format("#%02x%02x%02x",
-            color.getRed(),
-            color.getGreen(),
-            color.getBlue());
-    }
-
-    /**
      * Updates the impact label for one typist based on selected customisation options.
      *
      * @param index the index of the typist
@@ -944,6 +1018,67 @@ public class TypingRaceGUI
         }
 
         impactLabels[index].setText(impact);
+    }
+
+    /**
+     * Builds Typist objects from the current GUI customisation choices.
+     *
+     * @return an array of Typist objects
+     */
+    private Typist[] createTypistsFromGUI()
+    {
+        int seatCount = (Integer) seatCountSpinner.getValue();
+        Typist[] typists = new Typist[seatCount];
+
+        for (int i = 0; i < seatCount; i++)
+        {
+            String name = typistNames[i];
+            String selectedSymbol = (String) symbolBoxes[i].getSelectedItem();
+            char symbol = selectedSymbol.charAt(0);
+
+            double accuracy = 0.70;
+
+            if ("Touch Typist".equals(typingStyleBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy + 0.10;
+            }
+            else if ("Hunt & Peck".equals(typingStyleBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy - 0.10;
+            }
+            else if ("Voice-to-Text".equals(typingStyleBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy + 0.05;
+            }
+
+            if ("Mechanical".equals(keyboardTypeBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy + 0.05;
+            }
+            else if ("Touchscreen".equals(keyboardTypeBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy - 0.05;
+            }
+
+            if (nightShiftCheckBox.isSelected())
+            {
+                accuracy = accuracy - 0.05;
+            }
+
+            if (caffeineModeCheckBox.isSelected())
+            {
+                accuracy = accuracy + 0.03;
+            }
+
+            if (energyDrinkBoxes[i].isSelected())
+            {
+                accuracy = accuracy + 0.05;
+            }
+
+            typists[i] = new Typist(symbol, name, accuracy);
+        }
+
+        return typists;
     }
 
     /**

@@ -230,11 +230,63 @@ public class TypingRaceGUI
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 
         startRaceButton = new JButton("Start Race");
-        startRaceButton.addActionListener(e -> previewRaceConfiguration());
+        startRaceButton.addActionListener(e -> showRaceScreen());
 
         panel.add(startRaceButton);
 
         return panel;
+    }
+
+    /**
+     * Shows the basic race screen.
+     * The race lanes are divided equally based on the number of typists.
+     */
+    private void showRaceScreen()
+    {
+        Typist[] typists = createTypistsFromGUI();
+
+        JPanel racePanel = new JPanel(new BorderLayout(10, 10));
+        racePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JLabel titleLabel = new JLabel("Typing Race", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+
+        JPanel lanesPanel = new JPanel(new GridLayout(typists.length, 1, 5, 5));
+
+        for (int i = 0; i < typists.length; i++)
+        {
+            lanesPanel.add(createRaceLanePanel(typists[i]));
+        }
+
+        racePanel.add(titleLabel, BorderLayout.NORTH);
+        racePanel.add(lanesPanel, BorderLayout.CENTER);
+
+        frame.setContentPane(racePanel);
+        frame.revalidate();
+        frame.repaint();
+    }
+
+    /**
+     * Creates one visual lane for a typist in the race screen.
+     *
+     * @param typist the typist displayed in the lane
+     * @return the race lane panel
+     */
+    private JPanel createRaceLanePanel(Typist typist)
+    {
+        JPanel lanePanel = new JPanel(new BorderLayout(10, 10));
+        lanePanel.setBorder(BorderFactory.createTitledBorder(
+            typist.getSymbol() + " " + typist.getName()
+        ));
+
+        JTextArea passageArea = new JTextArea(selectedPassage);
+        passageArea.setLineWrap(true);
+        passageArea.setWrapStyleWord(true);
+        passageArea.setEditable(false);
+
+        lanePanel.add(new JScrollPane(passageArea), BorderLayout.CENTER);
+
+        return lanePanel;
     }
 
     /**
@@ -284,8 +336,6 @@ public class TypingRaceGUI
 
         return panel;
     }
-
-    
 
     /**
      * Updates the typist tabs based on the selected number of racers.

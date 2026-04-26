@@ -27,13 +27,14 @@ public class TypingRaceGUI
 
     private JComboBox<String>[] typingStyleBoxes;
     private JComboBox<String>[] keyboardTypeBoxes;
-    private JTextField[] symbolFields;
+    private JComboBox<String>[] symbolBoxes;
     private JComboBox<String>[] colourBoxes;
     private JCheckBox[] wristSupportBoxes;
     private JCheckBox[] energyDrinkBoxes;
     private JCheckBox[] noiseCancellingBoxes;
     private JLabel[] impactLabels;
 
+    private boolean updatingSymbols;
     private String selectedPassage;
 
     private final String[] typistNames = {
@@ -45,6 +46,10 @@ public class TypingRaceGUI
         "CTRL_ALT_ELITE"
     };
 
+    private final String[] availableSymbols = {
+        "■", "▲", "◆", "★", "⬤", "✖"
+    };
+
     /**
      * Constructor for TypingRaceGUI.
      * Initialises the GUI and sets up the window.
@@ -52,6 +57,7 @@ public class TypingRaceGUI
     public TypingRaceGUI()
     {
         selectedPassage = "";
+        updatingSymbols = false;
         createWindow();
     }
 
@@ -227,9 +233,12 @@ public class TypingRaceGUI
         return panel;
     }
 
+    
+
     /**
      * Updates the typist tabs based on the selected number of racers.
      */
+    @SuppressWarnings("unchecked")
     private void updateTypistTabs()
     {
         if (typistTabbedPane == null || seatCountSpinner == null)
@@ -241,7 +250,7 @@ public class TypingRaceGUI
 
         typingStyleBoxes = new JComboBox[count];
         keyboardTypeBoxes = new JComboBox[count];
-        symbolFields = new JTextField[count];
+        symbolBoxes = new JComboBox[count];
         colourBoxes = new JComboBox[count];
         wristSupportBoxes = new JCheckBox[count];
         energyDrinkBoxes = new JCheckBox[count];
@@ -252,8 +261,10 @@ public class TypingRaceGUI
 
         for (int i = 0; i < count; i++)
         {
-            typistTabbedPane.addTab(typistNames[i], createSingleTypistPanel(i));
+            typistTabbedPane.addTab(availableSymbols[i] + " " + typistNames[i], createSingleTypistPanel(i));
         }
+
+        updateSymbolAvailability();
 
         typistTabbedPane.revalidate();
         typistTabbedPane.repaint();
@@ -358,15 +369,87 @@ public class TypingRaceGUI
             "Black"
         };
 
-        symbolFields[index] = new JTextField(String.valueOf(index + 1), 3);
+        symbolBoxes[index] = new JComboBox<>(availableSymbols);
+        symbolBoxes[index].setSelectedItem(availableSymbols[index]);
+        symbolBoxes[index].addActionListener(e -> updateSymbolAvailability());
+
         colourBoxes[index] = new JComboBox<>(colours);
 
         panel.add(new JLabel("Typist symbol:"));
-        panel.add(symbolFields[index]);
+        panel.add(symbolBoxes[index]);
         panel.add(new JLabel("Progress colour:"));
         panel.add(colourBoxes[index]);
 
         return panel;
+    }
+
+    /**
+     * Updates all symbol dropdowns so a symbol already used by one typist
+     * cannot be selected by another typist.
+     */
+    private void updateSymbolAvailability()
+    {
+        if (updatingSymbols || symbolBoxes == null)
+        {
+            return;
+        }
+
+        updatingSymbols = true;
+
+        int count = (Integer) seatCountSpinner.getValue();
+        String[] selectedSymbols = new String[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            if (symbolBoxes[i] != null)
+            {
+                selectedSymbols[i] = (String) symbolBoxes[i].getSelectedItem();
+            }
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            if (symbolBoxes[i] != null)
+            {
+                String currentSymbol = selectedSymbols[i];
+
+                symbolBoxes[i].removeAllItems();
+
+                for (String symbol : availableSymbols)
+                {
+                    if (symbol.equals(currentSymbol) || !symbolIsUsedByAnotherTypist(symbol, selectedSymbols, i))
+                    {
+                        symbolBoxes[i].addItem(symbol);
+                    }
+                }
+
+                symbolBoxes[i].setSelectedItem(currentSymbol);
+                typistTabbedPane.setTitleAt(i, currentSymbol + " " + typistNames[i]);
+            }
+        }
+
+        updatingSymbols = false;
+    }
+
+    /**
+     * Checks whether a symbol is already selected by another typist.
+     *
+     * @param symbol the symbol to check
+     * @param selectedSymbols the currently selected symbols
+     * @param currentIndex the typist currently being checked
+     * @return true if another typist already uses the symbol
+     */
+    private boolean symbolIsUsedByAnotherTypist(String symbol, String[] selectedSymbols, int currentIndex)
+    {
+        for (int i = 0; i < selectedSymbols.length; i++)
+        {
+            if (i != currentIndex && symbol.equals(selectedSymbols[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

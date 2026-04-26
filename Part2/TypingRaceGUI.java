@@ -29,6 +29,10 @@ public class TypingRaceGUI
     private JTextField symbolField;
     private JComboBox<String> colourComboBox;
     private JLabel symbolColourImpactLabel;
+    private JCheckBox wristSupportCheckBox;
+    private JCheckBox energyDrinkCheckBox;
+    private JCheckBox noiseCancellingCheckBox;
+    private JLabel accessoryImpactLabel;
 
     private String selectedPassage;
 
@@ -228,10 +232,11 @@ public class TypingRaceGUI
         stylePanel.add(typingStyleImpactLabel);
 
         panel.add(stylePanel, BorderLayout.NORTH);
-        JPanel customisationOptionsPanel = new JPanel(new GridLayout(3, 1, 10, 10));
+        JPanel customisationOptionsPanel = new JPanel(new GridLayout(4, 1, 10, 10));
         customisationOptionsPanel.add(stylePanel);
         customisationOptionsPanel.add(createKeyboardTypePanel());
         customisationOptionsPanel.add(createSymbolColourPanel());
+        customisationOptionsPanel.add(createAccessoriesPanel());
 
         panel.add(customisationOptionsPanel, BorderLayout.NORTH);
 
@@ -299,6 +304,66 @@ private JPanel createSymbolColourPanel()
         panel.add(keyboardTypeImpactLabel);
 
         return panel;
+    }
+
+    /**
+     * Creates the accessories section based on coursework specification.
+     *
+     * @return the accessories panel
+     */
+    private JPanel createAccessoriesPanel()
+    {
+        JPanel panel = new JPanel(new GridLayout(4, 1, 5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("Accessories"));
+
+        wristSupportCheckBox = new JCheckBox("Wrist Support - reduces burnout duration");
+        energyDrinkCheckBox = new JCheckBox("Energy Drink - boosts accuracy early, reduces later");
+        noiseCancellingCheckBox = new JCheckBox("Noise-Cancelling Headphones - reduces mistype chance");
+
+        accessoryImpactLabel = new JLabel("Impact: Accessories affect typing performance.");
+
+        wristSupportCheckBox.addActionListener(e -> updateAccessoryImpact());
+        energyDrinkCheckBox.addActionListener(e -> updateAccessoryImpact());
+        noiseCancellingCheckBox.addActionListener(e -> updateAccessoryImpact());
+
+        panel.add(wristSupportCheckBox);
+        panel.add(energyDrinkCheckBox);
+        panel.add(noiseCancellingCheckBox);
+        panel.add(accessoryImpactLabel);
+
+        return panel;
+    }
+
+    /**
+     * Updates accessory impact description based on selected options.
+     */
+    private void updateAccessoryImpact()
+    {
+        String impact = "Impact: ";
+
+        if (wristSupportCheckBox.isSelected())
+        {
+            impact += "Lower burnout duration. ";
+        }
+
+        if (energyDrinkCheckBox.isSelected())
+        {
+            impact += "Higher early accuracy, lower later accuracy. ";
+        }
+
+        if (noiseCancellingCheckBox.isSelected())
+        {
+            impact += "Reduced mistype chance. ";
+        }
+
+        if (!wristSupportCheckBox.isSelected() &&
+            !energyDrinkCheckBox.isSelected() &&
+            !noiseCancellingCheckBox.isSelected())
+        {
+            impact += "No accessories selected.";
+        }
+
+        accessoryImpactLabel.setText(impact);
     }
 
     /**

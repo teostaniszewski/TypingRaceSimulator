@@ -58,6 +58,9 @@ public class TypingRaceGUI
     private long raceStartTime;
     private String lastRaceStats;
 
+    private String raceHistoryText;
+    private int raceNumber;
+
     private static final double MISTYPE_BASE_CHANCE = 0.30;
     private static final int SLIDE_BACK_AMOUNT = 2;
     private static final int BURNOUT_DURATION = 3;
@@ -85,6 +88,8 @@ public class TypingRaceGUI
         lastRaceStats = "No race has been run yet.\n\nStart a race to see statistics here.";
         bestWpmRecords = new double[typistNames.length];
         updatingSymbols = false;
+        raceHistoryText = "No race history available yet.";
+        raceNumber = 0;
         createWindow();
     }
 
@@ -491,6 +496,7 @@ public class TypingRaceGUI
         }
 
         lastRaceStats = buildStatsText();
+        addRaceToHistory(winner);
 
         if (viewStatsButton != null)
         {
@@ -552,6 +558,26 @@ public class TypingRaceGUI
         {
             pane.setText(selectedPassage);
         }
+    }
+    
+    /**
+     * Adds the completed race to the race history record.
+     *
+     * @param winner the winning typist
+     */
+    private void addRaceToHistory(Typist winner)
+    {
+        raceNumber++;
+
+        if (raceNumber == 1)
+        {
+            raceHistoryText = "";
+        }
+
+        raceHistoryText += "Race " + raceNumber + "\n";
+        raceHistoryText += "Winner: " + winner.getName() + "\n";
+        raceHistoryText += lastRaceStats;
+        raceHistoryText += "------------------------------\n\n";
     }
 
     /**
@@ -649,7 +675,7 @@ public class TypingRaceGUI
 
         statsTabs.addTab("Last Race", createStatsTextPanel(lastRaceStats));
         statsTabs.addTab("Personal Bests", createStatsTextPanel(buildPersonalBestsText()));
-        statsTabs.addTab("Race History", createStatsTextPanel("Full race history will appear here."));
+        statsTabs.addTab("Race History", createStatsTextPanel(raceHistoryText));
         statsTabs.addTab("Comparison", createStatsTextPanel("Comparison view will be added here."));
         statsTabs.addTab("Charts", createStatsTextPanel("Graphical display will be added here."));
 

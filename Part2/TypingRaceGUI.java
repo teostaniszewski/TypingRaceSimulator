@@ -1,6 +1,7 @@
 package Part2;
 
 import javax.swing.*;
+import javax.swing.text.*;
 import java.awt.*;
 
 /**
@@ -13,11 +14,16 @@ import java.awt.*;
 public class TypingRaceGUI
 {
     private JFrame frame;
+    private Timer raceTimer;
 
-    private JComboBox<String> passageComboBox;
+    private Typist[] currentTypists;
+    private JTextPane[] raceTextPanes;
+    private JLabel[] raceStatusLabels;
+    private boolean[] justMistyped;
+
     private JTextArea customPassageArea;
-
     private JSpinner seatCountSpinner;
+
     private JCheckBox autocorrectCheckBox;
     private JCheckBox caffeineModeCheckBox;
     private JCheckBox nightShiftCheckBox;
@@ -27,6 +33,7 @@ public class TypingRaceGUI
 
     private JTabbedPane typistTabbedPane;
 
+    private JComboBox<String> passageComboBox;
     private JComboBox<String>[] typingStyleBoxes;
     private JComboBox<String>[] keyboardTypeBoxes;
     private JComboBox<String>[] symbolBoxes;
@@ -39,6 +46,10 @@ public class TypingRaceGUI
 
     private boolean updatingSymbols;
     private String selectedPassage;
+
+    private static final double MISTYPE_BASE_CHANCE = 0.30;
+    private static final int SLIDE_BACK_AMOUNT = 2;
+    private static final int BURNOUT_DURATION = 3;
 
     private final String[] typistNames = {
         "TURBOFINGERS",
@@ -94,7 +105,6 @@ public class TypingRaceGUI
 
     /**
      * Creates the main race configuration panel.
-     * This contains passage selection, seat count, and difficulty modifiers.
      *
      * @return the race configuration panel
      */
@@ -117,7 +127,6 @@ public class TypingRaceGUI
         panel.add(seatBox);
         panel.add(Box.createVerticalStrut(5));
         panel.add(difficultyBox);
-
         panel.add(Box.createVerticalStrut(10));
         panel.add(createStartButtonSection());
 
@@ -238,12 +247,23 @@ public class TypingRaceGUI
     }
 
     /**
-     * Shows the basic race screen.
-     * The race lanes are divided equally based on the number of typists.
+     * Shows the race screen and starts the animated race.
      */
     private void showRaceScreen()
     {
-        Typist[] typists = createTypistsFromGUI();
+        if (selectedPassage.trim().isEmpty())
+        {
+            JOptionPane.showMessageDialog(frame,
+                "Please select or enter a passage before starting the race.",
+                "Missing Passage",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        currentTypists = createTypistsFromGUI();
+        raceTextPanes = new JTextPane[currentTypists.length];
+        raceStatusLabels = new JLabel[currentTypists.length];
+        justMistyped = new boolean[currentTypists.length];
 
         JPanel racePanel = new JPanel(new BorderLayout(10, 10));
         racePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -251,11 +271,11 @@ public class TypingRaceGUI
         JLabel titleLabel = new JLabel("Typing Race", JLabel.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
 
-        JPanel lanesPanel = new JPanel(new GridLayout(typists.length, 1, 5, 5));
+        JPanel lanesPanel = new JPanel(new GridLayout(currentTypists.length, 1, 5, 5));
 
-        for (int i = 0; i < typists.length; i++)
+        for (int i = 0; i < currentTypists.length; i++)
         {
-            lanesPanel.add(createRaceLanePanel(typists[i]));
+            lanesPanel.add(createRaceLanePanel(currentTypists[i], i));
         }
 
         racePanel.add(titleLabel, BorderLayout.NORTH);
@@ -264,58 +284,220 @@ public class TypingRaceGUI
         frame.setContentPane(racePanel);
         frame.revalidate();
         frame.repaint();
+
+        startRaceAnimation();
     }
 
     /**
-     * Creates one visual lane for a typist in the race screen.
+     * Creates one visual race lane for a typist.
      *
      * @param typist the typist displayed in the lane
+     * @param index the index of the typist
      * @return the race lane panel
      */
-    private JPanel createRaceLanePanel(Typist typist)
+    private JPanel createRaceLanePanel(Typist typist, int index)
     {
         JPanel lanePanel = new JPanel(new BorderLayout(10, 10));
         lanePanel.setBorder(BorderFactory.createTitledBorder(
             typist.getSymbol() + " " + typist.getName()
         ));
 
-        JTextArea passageArea = new JTextArea(selectedPassage);
-        passageArea.setLineWrap(true);
-        passageArea.setWrapStyleWord(true);
-        passageArea.setEditable(false);
+        JTextPane passagePane = new JTextPane();
+        passagePane.setEditable(false);
+        passagePane.setText(selectedPassage);
+        raceTextPanes[index] = passagePane;
 
-        lanePanel.add(new JScrollPane(passageArea), BorderLayout.CENTER);
+        raceStatusLabels[index] = new JLabel("Ready");
+
+        lanePanel.add(new JScrollPane(passagePane), BorderLayout.CENTER);
+        lanePanel.add(raceStatusLabels[index], BorderLayout.SOUTH);
 
         return lanePanel;
     }
 
     /**
-     * Previews the selected race configuration before starting the race.
+     * Starts the GUI race animation using a Swing timer.
      */
-    private void previewRaceConfiguration()
+    private void startRaceAnimation()
     {
-        int seatCount = (Integer) seatCountSpinner.getValue();
-        Typist[] typists = createTypistsFromGUI();
-        
-        String message = "Race configuration:\n\n"
-            + "Passage length: " + selectedPassage.length() + " characters\n"
-            + "Number of racers: " + seatCount + "\n"
-            + "Autocorrect: " + autocorrectCheckBox.isSelected() + "\n"
-            + "Caffeine Mode: " + caffeineModeCheckBox.isSelected() + "\n"
-            + "Night Shift: " + nightShiftCheckBox.isSelected() + "\n\n"
-            + "Typists:\n";
+        raceTimer = new Timer(250, e -> runRaceTurn());
+        raceTimer.start();
+    }
 
-        for (int i = 0; i < seatCount; i++)
+    /**
+     * Runs one turn of the race animation.
+     * Uses Typist methods for progress, slide-back and burnout state.
+     */
+    private void runRaceTurn()
+    {
+        for (int i = 0; i < currentTypists.length; i++)
         {
-            message += typistNames[i]
-                + " | Symbol: " + symbolBoxes[i].getSelectedItem()
-                + " | Style: " + typingStyleBoxes[i].getSelectedItem()
-                + " | Keyboard: " + keyboardTypeBoxes[i].getSelectedItem()
-                + " | Accuracy: " + String.format("%.2f", typists[i].getAccuracy())
-                + "\n";
+            Typist typist = currentTypists[i];
+            justMistyped[i] = false;
+
+            if (typist.isBurntOut())
+            {
+                typist.recoverFromBurnout();
+                updateRaceText(i);
+                updateRaceStatus(i);
+                continue;
+            }
+
+            if (Math.random() < typist.getAccuracy())
+            {
+                typist.typeCharacter();
+            }
+
+            double mistypeChance = (1.0 - typist.getAccuracy()) * MISTYPE_BASE_CHANCE;
+
+            if (noiseCancellingBoxes[i].isSelected())
+            {
+                mistypeChance -= 0.05;
+            }
+
+            if (Math.random() < mistypeChance)
+            {
+                int slideBackAmount = SLIDE_BACK_AMOUNT;
+
+                if (autocorrectCheckBox.isSelected())
+                {
+                    slideBackAmount = 1;
+                }
+
+                typist.slideBack(slideBackAmount);
+                justMistyped[i] = true;
+            }
+
+            if (Math.random() < 0.05 * typist.getAccuracy() * typist.getAccuracy())
+            {
+                int burnoutDuration = BURNOUT_DURATION;
+
+                if (wristSupportBoxes[i].isSelected())
+                {
+                    burnoutDuration = burnoutDuration - 1;
+                }
+
+                typist.burnOut(burnoutDuration);
+                typist.setAccuracy(typist.getAccuracy() - 0.01);
+            }
+
+            updateRaceText(i);
+            updateRaceStatus(i);
+
+            if (typist.getProgress() >= selectedPassage.length())
+            {
+                raceTimer.stop();
+
+                double oldAccuracy = typist.getAccuracy();
+                typist.setAccuracy(oldAccuracy + 0.02);
+
+                JOptionPane.showMessageDialog(frame,
+                    "And the winner is... " + typist.getName() + "!\n"
+                    + "Final accuracy: " + String.format("%.2f", typist.getAccuracy())
+                    + " (improved from " + String.format("%.2f", oldAccuracy) + ")",
+                    "Race Finished",
+                    JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Updates the visible passage text for one typist.
+     * Typed text is highlighted using the typist's selected colour.
+     *
+     * @param index the index of the typist
+     */
+    private void updateRaceText(int index)
+    {
+        int progress = currentTypists[index].getProgress();
+
+        if (progress > selectedPassage.length())
+        {
+            progress = selectedPassage.length();
         }
 
-        JOptionPane.showMessageDialog(frame, message, "Race Preview", JOptionPane.INFORMATION_MESSAGE);
+        JTextPane pane = raceTextPanes[index];
+        StyledDocument doc = pane.getStyledDocument();
+
+        try
+        {
+            doc.remove(0, doc.getLength());
+
+            SimpleAttributeSet typedStyle = new SimpleAttributeSet();
+            StyleConstants.setForeground(typedStyle, getSelectedColour(index));
+            StyleConstants.setBold(typedStyle, true);
+
+            SimpleAttributeSet remainingStyle = new SimpleAttributeSet();
+            StyleConstants.setForeground(remainingStyle, Color.BLACK);
+
+            doc.insertString(doc.getLength(), selectedPassage.substring(0, progress), typedStyle);
+            doc.insertString(doc.getLength(), "|", remainingStyle);
+            doc.insertString(doc.getLength(), selectedPassage.substring(progress), remainingStyle);
+        }
+        catch (BadLocationException e)
+        {
+            pane.setText(selectedPassage);
+        }
+    }
+
+    /**
+     * Updates the status label for one typist.
+     *
+     * @param index the index of the typist
+     */
+    private void updateRaceStatus(int index)
+    {
+        Typist typist = currentTypists[index];
+
+        if (typist.isBurntOut())
+        {
+            raceStatusLabels[index].setText("BURNT OUT (" + typist.getBurnoutTurnsRemaining() + " turns)");
+        }
+        else if (justMistyped[index])
+        {
+            raceStatusLabels[index].setText("Just mistyped [<]");
+        }
+        else
+        {
+            raceStatusLabels[index].setText("Progress: " + typist.getProgress()
+                + " / " + selectedPassage.length()
+                + " | Accuracy: " + String.format("%.2f", typist.getAccuracy()));
+        }
+    }
+
+    /**
+     * Gets the selected colour for a typist.
+     *
+     * @param index the index of the typist
+     * @return the selected colour
+     */
+    private Color getSelectedColour(int index)
+    {
+        String colour = (String) colourBoxes[index].getSelectedItem();
+
+        if ("Red".equals(colour))
+        {
+            return Color.RED;
+        }
+        else if ("Blue".equals(colour))
+        {
+            return Color.BLUE;
+        }
+        else if ("Green".equals(colour))
+        {
+            return new Color(0, 128, 0);
+        }
+        else if ("Purple".equals(colour))
+        {
+            return new Color(128, 0, 128);
+        }
+        else if ("Orange".equals(colour))
+        {
+            return Color.ORANGE;
+        }
+
+        return Color.BLACK;
     }
 
     /**
@@ -464,6 +646,11 @@ public class TypingRaceGUI
             if (nightShiftCheckBox.isSelected())
             {
                 accuracy = accuracy - 0.05;
+            }
+
+            if (caffeineModeCheckBox.isSelected())
+            {
+                accuracy = accuracy + 0.03;
             }
 
             if (energyDrinkBoxes[i].isSelected())
@@ -618,7 +805,7 @@ public class TypingRaceGUI
      */
     private JPanel createAccessoriesPanel(int index)
     {
-        JPanel panel = new JPanel(new GridLayout(5, 1, 5, 5));
+        JPanel panel = new JPanel(new GridLayout(4, 1, 5, 5));
         panel.setBorder(BorderFactory.createTitledBorder("Accessories"));
 
         wristSupportBoxes[index] = new JCheckBox("Wrist Support - reduces burnout duration");
@@ -631,14 +818,10 @@ public class TypingRaceGUI
         energyDrinkBoxes[index].addActionListener(e -> updateTypistImpact(index));
         noiseCancellingBoxes[index].addActionListener(e -> updateTypistImpact(index));
 
-        JButton applyButton = new JButton("Apply / Preview Effects");
-        applyButton.addActionListener(e -> applyAccessoryEffects(index));
-
         panel.add(wristSupportBoxes[index]);
         panel.add(energyDrinkBoxes[index]);
         panel.add(noiseCancellingBoxes[index]);
         panel.add(impactLabels[index]);
-        panel.add(applyButton);
 
         return panel;
     }
@@ -697,41 +880,6 @@ public class TypingRaceGUI
         }
 
         passageLengthLabel.setText("Passage length: " + selectedPassage.length() + " characters");
-    }
-
-    /**
-     * Calculates and displays the selected accessory effects for one typist.
-     *
-     * @param index the index of the typist
-     */
-    private void applyAccessoryEffects(int index)
-    {
-        int burnoutDurationChange = 0;
-        double accuracyChange = 0.0;
-        double mistypeChanceChange = 0.0;
-
-        if (wristSupportBoxes[index].isSelected())
-        {
-            burnoutDurationChange = burnoutDurationChange - 1;
-        }
-
-        if (energyDrinkBoxes[index].isSelected())
-        {
-            accuracyChange = accuracyChange + 0.05;
-        }
-
-        if (noiseCancellingBoxes[index].isSelected())
-        {
-            mistypeChanceChange = mistypeChanceChange - 0.05;
-        }
-
-        JOptionPane.showMessageDialog(frame,
-            "Effects for " + typistNames[index] + ":\n"
-            + "Burnout duration change: " + burnoutDurationChange + "\n"
-            + "Accuracy change: " + accuracyChange + "\n"
-            + "Mistype chance change: " + mistypeChanceChange,
-            "Typist Effects",
-            JOptionPane.INFORMATION_MESSAGE);
     }
 
     /**

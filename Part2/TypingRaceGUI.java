@@ -22,19 +22,28 @@ public class TypingRaceGUI
     private JCheckBox autocorrectCheckBox;
     private JCheckBox caffeineModeCheckBox;
     private JCheckBox nightShiftCheckBox;
-    private JComboBox<String> typingStyleComboBox;
-    private JLabel typingStyleImpactLabel;
-    private JComboBox<String> keyboardTypeComboBox;
-    private JLabel keyboardTypeImpactLabel;
-    private JTextField symbolField;
-    private JComboBox<String> colourComboBox;
-    private JLabel symbolColourImpactLabel;
-    private JCheckBox wristSupportCheckBox;
-    private JCheckBox energyDrinkCheckBox;
-    private JCheckBox noiseCancellingCheckBox;
-    private JLabel accessoryImpactLabel;
+
+    private JTabbedPane typistTabbedPane;
+
+    private JComboBox<String>[] typingStyleBoxes;
+    private JComboBox<String>[] keyboardTypeBoxes;
+    private JTextField[] symbolFields;
+    private JComboBox<String>[] colourBoxes;
+    private JCheckBox[] wristSupportBoxes;
+    private JCheckBox[] energyDrinkBoxes;
+    private JCheckBox[] noiseCancellingBoxes;
+    private JLabel[] impactLabels;
 
     private String selectedPassage;
+
+    private final String[] typistNames = {
+        "TURBOFINGERS",
+        "QWERTY_QUEEN",
+        "HUNT_N_PECK",
+        "KEYBOARD_NINJA",
+        "SPACEBAR_KING",
+        "CTRL_ALT_ELITE"
+    };
 
     /**
      * Constructor for TypingRaceGUI.
@@ -126,6 +135,7 @@ public class TypingRaceGUI
         customPassageArea.setEnabled(false);
         customPassageArea.setLineWrap(true);
         customPassageArea.setWrapStyleWord(true);
+
         JScrollPane scrollPane = new JScrollPane(customPassageArea);
         scrollPane.setPreferredSize(new Dimension(0, 80));
 
@@ -169,6 +179,8 @@ public class TypingRaceGUI
         editor.getTextField().setEditable(false);
         editor.getTextField().setHorizontalAlignment(JTextField.CENTER);
 
+        seatCountSpinner.addChangeListener(e -> updateTypistTabs());
+
         panel.add(label);
         panel.add(seatCountSpinner);
 
@@ -198,13 +210,7 @@ public class TypingRaceGUI
 
     /**
      * Creates the customisation panel for typist options.
-     * This will later include typing style, keyboard type, symbol, colour, and accessories.
-     *
-     * @return the customise typists panel
-     */
-    /**
-     * Creates the customisation panel for typist options.
-     * This includes typing style choices that affect the typist's behaviour.
+     * Each typist has their own tab.
      *
      * @return the customise typists panel
      */
@@ -213,8 +219,75 @@ public class TypingRaceGUI
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        JPanel stylePanel = new JPanel(new GridLayout(3, 1, 5, 5));
-        stylePanel.setBorder(BorderFactory.createTitledBorder("Typing Style"));
+        typistTabbedPane = new JTabbedPane();
+        panel.add(typistTabbedPane, BorderLayout.CENTER);
+
+        updateTypistTabs();
+
+        return panel;
+    }
+
+    /**
+     * Updates the typist tabs based on the selected number of racers.
+     */
+    private void updateTypistTabs()
+    {
+        if (typistTabbedPane == null || seatCountSpinner == null)
+        {
+            return;
+        }
+
+        int count = (Integer) seatCountSpinner.getValue();
+
+        typingStyleBoxes = new JComboBox[count];
+        keyboardTypeBoxes = new JComboBox[count];
+        symbolFields = new JTextField[count];
+        colourBoxes = new JComboBox[count];
+        wristSupportBoxes = new JCheckBox[count];
+        energyDrinkBoxes = new JCheckBox[count];
+        noiseCancellingBoxes = new JCheckBox[count];
+        impactLabels = new JLabel[count];
+
+        typistTabbedPane.removeAll();
+
+        for (int i = 0; i < count; i++)
+        {
+            typistTabbedPane.addTab(typistNames[i], createSingleTypistPanel(i));
+        }
+
+        typistTabbedPane.revalidate();
+        typistTabbedPane.repaint();
+    }
+
+    /**
+     * Creates a customisation panel for one typist.
+     *
+     * @param index the index of the typist
+     * @return the typist customisation panel
+     */
+    private JPanel createSingleTypistPanel(int index)
+    {
+        JPanel panel = new JPanel(new GridLayout(4, 1, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        panel.add(createTypingStylePanel(index));
+        panel.add(createKeyboardTypePanel(index));
+        panel.add(createSymbolColourPanel(index));
+        panel.add(createAccessoriesPanel(index));
+
+        return panel;
+    }
+
+    /**
+     * Creates the typing style customisation section for one typist.
+     *
+     * @param index the index of the typist
+     * @return the typing style panel
+     */
+    private JPanel createTypingStylePanel(int index)
+    {
+        JPanel panel = new JPanel(new GridLayout(3, 1, 5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("Typing Style"));
 
         String[] typingStyles = {
             "Touch Typist",
@@ -223,64 +296,25 @@ public class TypingRaceGUI
             "Voice-to-Text"
         };
 
-        typingStyleComboBox = new JComboBox<>(typingStyles);
-        typingStyleImpactLabel = new JLabel("Impact: Balanced accuracy and speed.");
+        typingStyleBoxes[index] = new JComboBox<>(typingStyles);
+        JLabel impactLabel = new JLabel("Impact: Balanced accuracy and speed.");
 
-        typingStyleComboBox.addActionListener(e -> updateTypingStyleImpact());
+        typingStyleBoxes[index].addActionListener(e -> updateTypistImpact(index));
 
-        stylePanel.add(new JLabel("Choose typing style:"));
-        stylePanel.add(typingStyleComboBox);
-        stylePanel.add(typingStyleImpactLabel);
-
-        panel.add(stylePanel, BorderLayout.NORTH);
-        JPanel customisationOptionsPanel = new JPanel(new GridLayout(4, 1, 10, 10));
-        customisationOptionsPanel.add(stylePanel);
-        customisationOptionsPanel.add(createKeyboardTypePanel());
-        customisationOptionsPanel.add(createSymbolColourPanel());
-        customisationOptionsPanel.add(createAccessoriesPanel());
-
-        panel.add(customisationOptionsPanel, BorderLayout.NORTH);
+        panel.add(new JLabel("Choose typing style:"));
+        panel.add(typingStyleBoxes[index]);
+        panel.add(impactLabel);
 
         return panel;
     }
 
     /**
-     * Creates the symbol and colour customisation section.
+     * Creates the keyboard type customisation section for one typist.
      *
-     * @return the symbol and colour panel
-     */
-    private JPanel createSymbolColourPanel()
-    {
-        JPanel panel = new JPanel(new GridLayout(4, 2, 5, 5));
-        panel.setBorder(BorderFactory.createTitledBorder("Symbol and Colour"));
-
-        symbolField = new JTextField("1", 3);
-
-        String[] colours = {
-            "Red",
-            "Blue",
-            "Green",
-            "Purple",
-            "Orange",
-            "Black"
-        };
-
-        colourComboBox = new JComboBox<>(colours);
-
-        panel.add(new JLabel("Typist symbol:"));
-        panel.add(symbolField);
-        panel.add(new JLabel("Progress colour:"));
-        panel.add(colourComboBox);
-
-        return panel;
-    }
-
-    /**
-     * Creates the keyboard type customisation section.
-     *
+     * @param index the index of the typist
      * @return the keyboard type panel
      */
-    private JPanel createKeyboardTypePanel()
+    private JPanel createKeyboardTypePanel(int index)
     {
         JPanel panel = new JPanel(new GridLayout(3, 1, 5, 5));
         panel.setBorder(BorderFactory.createTitledBorder("Keyboard Type"));
@@ -292,126 +326,114 @@ public class TypingRaceGUI
             "Stenography"
         };
 
-        keyboardTypeComboBox = new JComboBox<>(keyboardTypes);
-        keyboardTypeImpactLabel = new JLabel("Impact: Mechanical keyboard gives steady typing performance.");
+        keyboardTypeBoxes[index] = new JComboBox<>(keyboardTypes);
+        JLabel impactLabel = new JLabel("Impact: Steady typing performance.");
 
-        keyboardTypeComboBox.addActionListener(e -> updateKeyboardTypeImpact());
+        keyboardTypeBoxes[index].addActionListener(e -> updateTypistImpact(index));
 
         panel.add(new JLabel("Choose keyboard type:"));
-        panel.add(keyboardTypeComboBox);
-        panel.add(keyboardTypeImpactLabel);
+        panel.add(keyboardTypeBoxes[index]);
+        panel.add(impactLabel);
 
         return panel;
     }
 
     /**
-     * Creates the accessories section based on coursework specification.
+     * Creates the symbol and colour customisation section for one typist.
      *
+     * @param index the index of the typist
+     * @return the symbol and colour panel
+     */
+    private JPanel createSymbolColourPanel(int index)
+    {
+        JPanel panel = new JPanel(new GridLayout(2, 2, 5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("Symbol and Colour"));
+
+        String[] colours = {
+            "Red",
+            "Blue",
+            "Green",
+            "Purple",
+            "Orange",
+            "Black"
+        };
+
+        symbolFields[index] = new JTextField(String.valueOf(index + 1), 3);
+        colourBoxes[index] = new JComboBox<>(colours);
+
+        panel.add(new JLabel("Typist symbol:"));
+        panel.add(symbolFields[index]);
+        panel.add(new JLabel("Progress colour:"));
+        panel.add(colourBoxes[index]);
+
+        return panel;
+    }
+
+    /**
+     * Creates the accessories section for one typist.
+     *
+     * @param index the index of the typist
      * @return the accessories panel
      */
-    private JPanel createAccessoriesPanel()
+    private JPanel createAccessoriesPanel(int index)
     {
-        JPanel panel = new JPanel(new GridLayout(4, 1, 5, 5));
+        JPanel panel = new JPanel(new GridLayout(5, 1, 5, 5));
         panel.setBorder(BorderFactory.createTitledBorder("Accessories"));
 
-        wristSupportCheckBox = new JCheckBox("Wrist Support - reduces burnout duration");
-        energyDrinkCheckBox = new JCheckBox("Energy Drink - boosts accuracy early, reduces later");
-        noiseCancellingCheckBox = new JCheckBox("Noise-Cancelling Headphones - reduces mistype chance");
+        wristSupportBoxes[index] = new JCheckBox("Wrist Support - reduces burnout duration");
+        energyDrinkBoxes[index] = new JCheckBox("Energy Drink - boosts accuracy early, reduces later");
+        noiseCancellingBoxes[index] = new JCheckBox("Noise-Cancelling Headphones - reduces mistype chance");
 
-        wristSupportCheckBox.addActionListener(e -> updateAccessoryImpact());
-        energyDrinkCheckBox.addActionListener(e -> updateAccessoryImpact());
-        noiseCancellingCheckBox.addActionListener(e -> updateAccessoryImpact());
-        JButton applyAccessoriesButton = new JButton("Apply Accessory Effects");
-        applyAccessoriesButton.addActionListener(e -> applyAccessoryEffects());
+        impactLabels[index] = new JLabel("Impact: No accessories selected.");
 
-        panel.add(wristSupportCheckBox);
-        panel.add(energyDrinkCheckBox);
-        panel.add(noiseCancellingCheckBox);
-        panel.add(applyAccessoriesButton);
+        wristSupportBoxes[index].addActionListener(e -> updateTypistImpact(index));
+        energyDrinkBoxes[index].addActionListener(e -> updateTypistImpact(index));
+        noiseCancellingBoxes[index].addActionListener(e -> updateTypistImpact(index));
+
+        JButton applyButton = new JButton("Apply / Preview Effects");
+        applyButton.addActionListener(e -> applyAccessoryEffects(index));
+
+        panel.add(wristSupportBoxes[index]);
+        panel.add(energyDrinkBoxes[index]);
+        panel.add(noiseCancellingBoxes[index]);
+        panel.add(impactLabels[index]);
+        panel.add(applyButton);
 
         return panel;
     }
 
     /**
-     * Updates accessory impact description based on selected options.
+     * Updates the impact label for one typist based on selected customisation options.
+     *
+     * @param index the index of the typist
      */
-    private void updateAccessoryImpact()
+    private void updateTypistImpact(int index)
     {
         String impact = "Impact: ";
 
-        if (wristSupportCheckBox.isSelected())
+        if (wristSupportBoxes[index].isSelected())
         {
             impact += "Lower burnout duration. ";
         }
 
-        if (energyDrinkCheckBox.isSelected())
+        if (energyDrinkBoxes[index].isSelected())
         {
             impact += "Higher early accuracy, lower later accuracy. ";
         }
 
-        if (noiseCancellingCheckBox.isSelected())
+        if (noiseCancellingBoxes[index].isSelected())
         {
             impact += "Reduced mistype chance. ";
         }
 
-        if (!wristSupportCheckBox.isSelected() &&
-            !energyDrinkCheckBox.isSelected() &&
-            !noiseCancellingCheckBox.isSelected())
+        if (!wristSupportBoxes[index].isSelected() &&
+            !energyDrinkBoxes[index].isSelected() &&
+            !noiseCancellingBoxes[index].isSelected())
         {
             impact += "No accessories selected.";
         }
 
-        accessoryImpactLabel.setText(impact);
-    }
-
-    /**
-     * Updates the description of how the selected keyboard type affects performance.
-     */
-    private void updateKeyboardTypeImpact()
-    {
-        String selectedKeyboard = (String) keyboardTypeComboBox.getSelectedItem();
-
-        if ("Mechanical".equals(selectedKeyboard))
-        {
-            keyboardTypeImpactLabel.setText("Impact: Steady typing performance.");
-        }
-        else if ("Membrane".equals(selectedKeyboard))
-        {
-            keyboardTypeImpactLabel.setText("Impact: Slightly lower speed, but stable accuracy.");
-        }
-        else if ("Touchscreen".equals(selectedKeyboard))
-        {
-            keyboardTypeImpactLabel.setText("Impact: Higher mistype chance.");
-        }
-        else if ("Stenography".equals(selectedKeyboard))
-        {
-            keyboardTypeImpactLabel.setText("Impact: Very fast typing, but harder to control.");
-        }
-    }
-
-    /**
-     * Updates the description of how the selected typing style affects performance.
-     */
-    private void updateTypingStyleImpact()
-    {
-        String selectedStyle = (String) typingStyleComboBox.getSelectedItem();
-
-        if ("Touch Typist".equals(selectedStyle))
-        {
-            typingStyleImpactLabel.setText("Impact: Balanced accuracy and speed.");
-        }
-        else if ("Hunt & Peck".equals(selectedStyle))
-        {
-            typingStyleImpactLabel.setText("Impact: Lower speed, slightly lower burnout risk.");
-        }
-        else if ("Phone Thumbs".equals(selectedStyle))
-        {
-            typingStyleImpactLabel.setText("Impact: Moderate speed, higher mistype chance.");
-        }
-        else if ("Voice-to-Text".equals(selectedStyle))
-        {
-            typingStyleImpactLabel.setText("Impact: Fast input, but accuracy may vary.");
-        }
+        impactLabels[index].setText(impact);
     }
 
     /**
@@ -437,35 +459,37 @@ public class TypingRaceGUI
     }
 
     /**
-     * Calculates and displays the effects of selected accessories.
+     * Calculates and displays the selected accessory effects for one typist.
+     *
+     * @param index the index of the typist
      */
-    private void applyAccessoryEffects()
+    private void applyAccessoryEffects(int index)
     {
         int burnoutDurationChange = 0;
         double accuracyChange = 0.0;
         double mistypeChanceChange = 0.0;
 
-        if (wristSupportCheckBox.isSelected())
+        if (wristSupportBoxes[index].isSelected())
         {
             burnoutDurationChange = burnoutDurationChange - 1;
         }
 
-        if (energyDrinkCheckBox.isSelected())
+        if (energyDrinkBoxes[index].isSelected())
         {
             accuracyChange = accuracyChange + 0.05;
         }
 
-        if (noiseCancellingCheckBox.isSelected())
+        if (noiseCancellingBoxes[index].isSelected())
         {
             mistypeChanceChange = mistypeChanceChange - 0.05;
         }
 
         JOptionPane.showMessageDialog(frame,
-            "Accessory effects applied:\n"
+            "Effects for " + typistNames[index] + ":\n"
             + "Burnout duration change: " + burnoutDurationChange + "\n"
             + "Accuracy change: " + accuracyChange + "\n"
             + "Mistype chance change: " + mistypeChanceChange,
-            "Accessory Effects",
+            "Typist Effects",
             JOptionPane.INFORMATION_MESSAGE);
     }
 

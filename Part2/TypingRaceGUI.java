@@ -340,9 +340,8 @@ public class TypingRaceGUI
     private JPanel createRaceLanePanel(Typist typist, int index)
     {
         JPanel lanePanel = new JPanel(new BorderLayout(10, 10));
-        lanePanel.setBorder(BorderFactory.createTitledBorder(
-            typist.getSymbol() + " " + typist.getName()
-        ));
+        String hex = toHex(getSelectedColourSafe(index));
+        lanePanel.setBorder(BorderFactory.createTitledBorder("<html><font color='" + hex + "'>" + typist.getSymbol() + "</font> " + typist.getName() + "</html>"));
 
         JTextPane passagePane = new JTextPane();
         passagePane.setEditable(false);
@@ -597,7 +596,9 @@ public class TypingRaceGUI
 
         for (int i = 0; i < count; i++)
         {
-            typistTabbedPane.addTab(availableSymbols[i] + " " + typistNames[i], createSingleTypistPanel(i));
+            String hex = toHex(getSelectedColourSafe(i));
+            typistTabbedPane.addTab("<html><font color='" + hex + "'>" + availableSymbols[i] + "</font> " + typistNames[i] + "</html>",
+            createSingleTypistPanel(i));
         }
 
         updateSymbolAvailability();
@@ -771,6 +772,7 @@ public class TypingRaceGUI
         symbolBoxes[index].addActionListener(e -> updateSymbolAvailability());
 
         colourBoxes[index] = new JComboBox<>(colours);
+        colourBoxes[index].addActionListener(e -> updateSymbolAvailability());
 
         panel.add(new JLabel("Typist symbol:"));
         panel.add(symbolBoxes[index]);
@@ -821,7 +823,8 @@ public class TypingRaceGUI
                 }
 
                 symbolBoxes[i].setSelectedItem(currentSymbol);
-                typistTabbedPane.setTitleAt(i, currentSymbol + " " + typistNames[i]);
+                String hex = toHex(getSelectedColourSafe(i));
+                typistTabbedPane.setTitleAt(i,"<html><font color='" + hex + "'>" + currentSymbol + "</font> " + typistNames[i] + "</html>");
             }
         }
 
@@ -876,6 +879,37 @@ public class TypingRaceGUI
         panel.add(impactLabels[index]);
 
         return panel;
+    }
+
+    /**
+     * Safely gets the selected colour for a typist.
+     * This prevents errors if the colour dropdown has not been created yet.
+     *
+     * @param index the index of the typist
+     * @return the selected colour, or black as a fallback
+     */
+    private Color getSelectedColourSafe(int index)
+    {
+        if (colourBoxes == null || colourBoxes[index] == null)
+        {
+            return Color.BLACK;
+        }
+
+        return getSelectedColour(index);
+    }
+
+    /**
+     * Converts a Color object into a hex colour string for HTML text.
+     *
+     * @param color the colour to convert
+     * @return the colour as a hex string
+     */
+    private String toHex(Color color)
+    {
+        return String.format("#%02x%02x%02x",
+            color.getRed(),
+            color.getGreen(),
+            color.getBlue());
     }
 
     /**

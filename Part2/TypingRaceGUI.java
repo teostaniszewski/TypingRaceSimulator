@@ -2,6 +2,7 @@ package Part2;
 
 import javax.swing.*;
 import java.awt.*;
+import Part1.Typist;
 
 /**
  * Graphical user interface for the Typing Race Simulator.
@@ -258,9 +259,11 @@ public class TypingRaceGUI
                 + " | Symbol: " + symbolBoxes[i].getSelectedItem()
                 + " | Style: " + typingStyleBoxes[i].getSelectedItem()
                 + " | Keyboard: " + keyboardTypeBoxes[i].getSelectedItem()
+                + " | Accuracy: " + String.format("%.2f", typists[i].getAccuracy())
                 + "\n";
         }
 
+        Typist[] typists = createTypistsFromGUI();
         JOptionPane.showMessageDialog(frame, message, "Race Preview", JOptionPane.INFORMATION_MESSAGE);
     }
 
@@ -367,6 +370,62 @@ public class TypingRaceGUI
         panel.add(impactLabel);
 
         return panel;
+    }
+
+    /**
+     * Builds Typist objects from the current GUI customisation choices.
+     *
+     * @return an array of Typist objects
+     */
+    private Typist[] createTypistsFromGUI()
+    {
+        int seatCount = (Integer) seatCountSpinner.getValue();
+        Typist[] typists = new Typist[seatCount];
+
+        for (int i = 0; i < seatCount; i++)
+        {
+            String name = typistNames[i];
+            String selectedSymbol = (String) symbolBoxes[i].getSelectedItem();
+            char symbol = selectedSymbol.charAt(0);
+
+            double accuracy = 0.70;
+
+            if ("Touch Typist".equals(typingStyleBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy + 0.10;
+            }
+            else if ("Hunt & Peck".equals(typingStyleBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy - 0.10;
+            }
+            else if ("Voice-to-Text".equals(typingStyleBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy + 0.05;
+            }
+
+            if ("Mechanical".equals(keyboardTypeBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy + 0.05;
+            }
+            else if ("Touchscreen".equals(keyboardTypeBoxes[i].getSelectedItem()))
+            {
+                accuracy = accuracy - 0.05;
+            }
+
+            if (nightShiftCheckBox.isSelected())
+            {
+                accuracy = accuracy - 0.05;
+            }
+
+            if (energyDrinkBoxes[i].isSelected())
+            {
+                accuracy = accuracy + 0.05;
+            }
+
+            typists[i] = new Typist(symbol, name, accuracy);
+        }
+
+        return typists;
     }
 
     /**

@@ -16,12 +16,14 @@ public class TypingRaceGUI
 
     private JComboBox<String> passageComboBox;
     private JTextArea customPassageArea;
-    private JLabel passageLengthLabel;
 
     private JSpinner seatCountSpinner;
     private JCheckBox autocorrectCheckBox;
     private JCheckBox caffeineModeCheckBox;
     private JCheckBox nightShiftCheckBox;
+    private JCheckBox[] wristSupportBoxes;
+    private JCheckBox[] energyDrinkBoxes;
+    private JCheckBox[] noiseCancellingBoxes;
 
     private JTabbedPane typistTabbedPane;
 
@@ -29,10 +31,11 @@ public class TypingRaceGUI
     private JComboBox<String>[] keyboardTypeBoxes;
     private JComboBox<String>[] symbolBoxes;
     private JComboBox<String>[] colourBoxes;
-    private JCheckBox[] wristSupportBoxes;
-    private JCheckBox[] energyDrinkBoxes;
-    private JCheckBox[] noiseCancellingBoxes;
+
     private JLabel[] impactLabels;
+    private JLabel passageLengthLabel;
+
+    private JButton startRaceButton;
 
     private boolean updatingSymbols;
     private String selectedPassage;
@@ -114,6 +117,9 @@ public class TypingRaceGUI
         panel.add(seatBox);
         panel.add(Box.createVerticalStrut(5));
         panel.add(difficultyBox);
+
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(createStartButtonSection());
 
         return panel;
     }
@@ -212,6 +218,50 @@ public class TypingRaceGUI
         panel.add(nightShiftCheckBox);
 
         return panel;
+    }
+
+    /**
+     * Creates the start race button section.
+     *
+     * @return the start button panel
+     */
+    private JPanel createStartButtonSection()
+    {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+
+        startRaceButton = new JButton("Start Race");
+        startRaceButton.addActionListener(e -> previewRaceConfiguration());
+
+        panel.add(startRaceButton);
+
+        return panel;
+    }
+
+    /**
+     * Previews the selected race configuration before starting the race.
+     */
+    private void previewRaceConfiguration()
+    {
+        int seatCount = (Integer) seatCountSpinner.getValue();
+
+        String message = "Race configuration:\n\n"
+            + "Passage length: " + selectedPassage.length() + " characters\n"
+            + "Number of racers: " + seatCount + "\n"
+            + "Autocorrect: " + autocorrectCheckBox.isSelected() + "\n"
+            + "Caffeine Mode: " + caffeineModeCheckBox.isSelected() + "\n"
+            + "Night Shift: " + nightShiftCheckBox.isSelected() + "\n\n"
+            + "Typists:\n";
+
+        for (int i = 0; i < seatCount; i++)
+        {
+            message += typistNames[i]
+                + " | Symbol: " + symbolBoxes[i].getSelectedItem()
+                + " | Style: " + typingStyleBoxes[i].getSelectedItem()
+                + " | Keyboard: " + keyboardTypeBoxes[i].getSelectedItem()
+                + "\n";
+        }
+
+        JOptionPane.showMessageDialog(frame, message, "Race Preview", JOptionPane.INFORMATION_MESSAGE);
     }
 
     /**

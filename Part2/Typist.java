@@ -43,7 +43,7 @@ public class Typist
         this.isBurntOut = false;
         this.burnoutTurnsRemaining = 0;
 
-        setAccuracy(typistAccuracy);
+        this.accuracy = clampAccuracy(typistAccuracy);
     }
 
 
@@ -196,18 +196,27 @@ public class Typist
      */
     public void setAccuracy(double newAccuracy)
     {
+        accuracy = clampAccuracy(newAccuracy);
+    }
+
+    /**
+     * Keeps an accuracy value between 0.0 and 1.0.
+     *
+     * @param newAccuracy the accuracy value to clamp
+     * @return the clamped accuracy
+     */
+    private static double clampAccuracy(double newAccuracy)
+    {
         if (newAccuracy < 0.0)
         {
-            accuracy = 0.0;
+            return 0.0;
         }
         else if (newAccuracy > 1.0)
         {
-            accuracy = 1.0;
+            return 1.0;
         }
-        else
-        {
-            accuracy = newAccuracy;
-        }
+
+        return newAccuracy;
     }
 
     /**

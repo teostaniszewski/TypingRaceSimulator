@@ -44,6 +44,8 @@ public class TypingRaceGUI
     private JCheckBox[] wristSupportBoxes;
     private JCheckBox[] energyDrinkBoxes;
     private JCheckBox[] noiseCancellingBoxes;
+    private JCheckBox[] postureSeatBoxes;
+    private JCheckBox[] coolingFanBoxes;
 
     private JTabbedPane typistTabbedPane;
 
@@ -52,6 +54,7 @@ public class TypingRaceGUI
     private JComboBox<String>[] keyboardTypeBoxes;
     private JComboBox<String>[] symbolBoxes;
     private JComboBox<String>[] colourBoxes;
+    private JComboBox<String>[] sponsorBoxes;
 
     private JLabel[] impactLabels;
     private JLabel[] typingStyleImpactLabels;
@@ -79,6 +82,10 @@ public class TypingRaceGUI
     private boolean[] savedWristSupports;
     private boolean[] savedEnergyDrinks;
     private boolean[] savedNoiseCancelling;
+    private boolean[] savedPostureSeats;
+    private boolean[] savedCoolingFans;
+    private String[] savedSponsors;
+    private boolean[][] ownedUpgrades;
 
     private int[] mistypeCounts;
     private int[] burnoutCounts;
@@ -86,6 +93,7 @@ public class TypingRaceGUI
     private double[] startingAccuracies;
     private double[] bestWpmRecords;
     private int[] leaderboardPoints;
+    private int[] totalCoins;
     private int[] consecutiveWinCounts;
     private double[] speedModifiers;
     private double[] mistypeRateModifiers;
@@ -95,6 +103,7 @@ public class TypingRaceGUI
 
     private long raceStartTime;
     private int raceNumber;
+    private int selectedMainTabIndex;
     private RacePerformance[] lastRacePerformances;
     private ArrayList<RacePerformance>[] typistRaceHistories;
 
@@ -148,6 +157,57 @@ public class TypingRaceGUI
         "Custom Passage"
     };
 
+    private final String[] sponsorOptions = {
+        "No Sponsor",
+        "KeyCorp: +15 coins for zero burnouts",
+        "SpeedStack: +15 coins for WPM >= 30",
+        "PodiumPay: +12 coins for top 3 finish",
+        "AccuracyLabs: +10 coins for 90% accuracy"
+    };
+
+    private final String[] keyboardUpgrades = {
+        "Mechanical",
+        "Ergonomic",
+        "Optical",
+        "Stenography"
+    };
+
+    private final String[] shopUpgradeNames = {
+        "Mechanical Keyboard",
+        "Ergonomic Keyboard",
+        "Optical Keyboard",
+        "Stenography Rig",
+        "Wrist Support",
+        "Energy Drink",
+        "Noise-Cancelling Headphones",
+        "Gaming Chair",
+        "Cooling Fan"
+    };
+
+    private final int[] shopUpgradeCosts = {
+        120,
+        150,
+        180,
+        220,
+        90,
+        75,
+        110,
+        130,
+        100
+    };
+
+    private final String[] shopUpgradeDescriptions = {
+        "Unlocks Mechanical keyboard: faster speed and fewer mistypes.",
+        "Unlocks Ergonomic keyboard: steadier accuracy and less burnout risk.",
+        "Unlocks Optical keyboard: very fast with a small mistype trade-off.",
+        "Unlocks Stenography keyboard: much faster, but trickier.",
+        "Unlocks Wrist Support: shorter burnouts.",
+        "Unlocks Energy Drink: stronger early speed and accuracy.",
+        "Unlocks Noise-Cancelling Headphones: fewer mistypes.",
+        "Unlocks Gaming Chair: lower burnout chance.",
+        "Unlocks Cooling Fan: shorter burnouts and steadier late race accuracy."
+    };
+
     /**
      * Constructor for TypingRaceGUI.
      * Initialises the GUI and sets up the window.
@@ -157,6 +217,7 @@ public class TypingRaceGUI
         selectedPassage = "";
         bestWpmRecords = new double[typistNames.length];
         leaderboardPoints = new int[typistNames.length];
+        totalCoins = new int[typistNames.length];
         consecutiveWinCounts = new int[typistNames.length];
         lastRacePerformances = new RacePerformance[0];
         initialiseRaceHistories();
@@ -164,26 +225,13 @@ public class TypingRaceGUI
         updatingSymbols = false;
         showingCustomPassagePlaceholder = false;
         raceNumber = 0;
+        selectedMainTabIndex = 0;
         createWindow();
     }
 
-    /**
-     * Creates the main application window.
+    /*
+     * Core logic and state helpers.
      */
-    private void createWindow()
-    {
-        configureThemeDefaults();
-
-        frame = new JFrame("Typing Race Simulator");
-        frame.setUndecorated(true);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1500, 850);
-        frame.setLocationRelativeTo(null);
-        frame.getContentPane().setBackground(BG_DARK);
-
-        frame.setContentPane(createWindowContent(createMainPanel()));
-        frame.setVisible(true);
-    }
 
     /**
      * Initialises per-typist race history storage.
@@ -218,14 +266,2028 @@ public class TypingRaceGUI
         savedWristSupports = new boolean[typistNames.length];
         savedEnergyDrinks = new boolean[typistNames.length];
         savedNoiseCancelling = new boolean[typistNames.length];
+        savedPostureSeats = new boolean[typistNames.length];
+        savedCoolingFans = new boolean[typistNames.length];
+        savedSponsors = new String[typistNames.length];
+        ownedUpgrades = new boolean[typistNames.length][shopUpgradeNames.length];
 
         for (int i = 0; i < typistNames.length; i++)
         {
             savedTypingStyles[i] = "Touch Typist";
-            savedKeyboardTypes[i] = "Mechanical";
+            savedKeyboardTypes[i] = "Membrane";
             savedSymbols[i] = availableSymbols[i];
             savedColours[i] = availableColours[i];
+            savedSponsors[i] = sponsorOptions[0];
         }
+    }
+
+    /**
+     * Shows the race screen and starts the animated race.
+     */
+    private void showRaceScreen()
+    {
+        saveCurrentOptions();
+
+        if (selectedPassage.trim().isEmpty())
+        {
+            JOptionPane.showMessageDialog(frame,
+                "Please select or enter a passage before starting the race.",
+                "Missing Passage",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int seatCount = (Integer) seatCountSpinner.getValue();
+        speedModifiers = new double[seatCount];
+        mistypeRateModifiers = new double[seatCount];
+        burnoutChanceModifiers = new double[seatCount];
+        burnoutDurationModifiers = new int[seatCount];
+        energyDrinkPenaltyApplied = new boolean[seatCount];
+
+        currentTypists = createTypistsFromGUI();
+        raceTextPanes = new JTextPane[currentTypists.length];
+        raceStatusLabels = new JLabel[currentTypists.length];
+        justMistyped = new boolean[currentTypists.length];
+
+        mistypeCounts = new int[currentTypists.length];
+        burnoutCounts = new int[currentTypists.length];
+        startingAccuracies = new double[currentTypists.length];
+        raceStartTime = System.currentTimeMillis();
+
+        for (int i = 0; i < currentTypists.length; i++)
+        {
+            startingAccuracies[i] = currentTypists[i].getAccuracy();
+        }
+
+        JPanel racePanel = new JPanel(new BorderLayout(12, 25));
+        racePanel.setBorder(BorderFactory.createEmptyBorder(14, 24, 22, 34));
+
+        JLabel titleLabel = new JLabel("< Typing Race Simulator />", JLabel.CENTER);
+        titleLabel.setFont(new Font("Consolas", Font.BOLD, 30));
+        titleLabel.setForeground(PURPLE);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+
+        JPanel lanesPanel = new ScrollableContentPanel();
+        lanesPanel.setLayout(new BoxLayout(lanesPanel, BoxLayout.Y_AXIS));
+        lanesPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 18));
+        stylePanel(lanesPanel);
+
+        for (int i = 0; i < currentTypists.length; i++)
+        {
+            lanesPanel.add(createRaceLanePanel(currentTypists[i], i));
+            lanesPanel.add(Box.createVerticalStrut(14));
+        }
+
+        JScrollPane lanesScrollPane = new JScrollPane(lanesPanel);
+        lanesScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        styleBorderlessScrollPane(lanesScrollPane);
+
+        racePanel.add(titleLabel, BorderLayout.NORTH);
+        racePanel.add(lanesScrollPane, BorderLayout.CENTER);
+        racePanel.add(createRaceButtonPanel(), BorderLayout.SOUTH);
+
+        frame.setContentPane(createWindowContent(racePanel));
+        frame.revalidate();
+        frame.repaint();
+        stylePanel(racePanel);
+
+        startRaceAnimation();
+    }
+
+    /**
+     * Starts the GUI race animation using a Swing timer.
+     */
+    private void startRaceAnimation()
+    {
+        raceTimer = new Timer(450, e -> runRaceTurn());
+        raceTimer.start();
+    }
+
+    /**
+     * Runs one turn of the race animation.
+     * Uses Typist methods for progress, slide-back and burnout state.
+     */
+    private void runRaceTurn()
+    {
+        for (int i = 0; i < currentTypists.length; i++)
+        {
+            Typist typist = currentTypists[i];
+            justMistyped[i] = false;
+            applyMidRaceEnergyDrinkPenalty(i);
+
+            if (typist.isBurntOut())
+            {
+                typist.recoverFromBurnout();
+                updateRaceText(i);
+                updateRaceStatus(i);
+                continue;
+            }
+
+            typeCharactersForTurn(typist, speedModifiers[i]);
+
+            double mistypeChance = (1.0 - typist.getAccuracy())
+                * MISTYPE_BASE_CHANCE
+                * mistypeRateModifiers[i];
+
+            if (noiseCancellingBoxes[i].isSelected())
+            {
+                mistypeChance = mistypeChance * 0.75;
+            }
+
+            if (mistypeChance < 0.0)
+            {
+                mistypeChance = 0.0;
+            }
+
+            if (Math.random() < mistypeChance)
+            {
+                int slideBackAmount = SLIDE_BACK_AMOUNT;
+
+                if (autocorrectCheckBox.isSelected())
+                {
+                    slideBackAmount = 1;
+                }
+
+                typist.slideBack(slideBackAmount);
+                justMistyped[i] = true;
+                mistypeCounts[i]++;
+            }
+
+            double burnoutChance = 0.04 * burnoutChanceModifiers[i];
+
+            if (caffeineModeCheckBox.isSelected())
+            {
+                burnoutChance = burnoutChance * 1.35;
+            }
+
+            if (postureSeatBoxes[i].isSelected())
+            {
+                burnoutChance = burnoutChance * 0.85;
+            }
+
+            if (Math.random() < burnoutChance)
+            {
+                int burnoutDuration = BURNOUT_DURATION + burnoutDurationModifiers[i];
+
+                if (wristSupportBoxes[i].isSelected())
+                {
+                    burnoutDuration = burnoutDuration - 1;
+                }
+
+                if (coolingFanBoxes[i].isSelected())
+                {
+                    burnoutDuration = burnoutDuration - 1;
+                }
+
+                if (burnoutDuration < 1)
+                {
+                    burnoutDuration = 1;
+                }
+
+                typist.burnOut(burnoutDuration);
+                burnoutCounts[i]++;
+                typist.setAccuracy(typist.getAccuracy() - 0.01);
+            }
+
+            updateRaceText(i);
+            updateRaceStatus(i);
+
+            if (typist.getProgress() >= selectedPassage.length())
+            {
+                finishRace(typist);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Gives a typist one or more typing attempts based on their speed profile.
+     *
+     * @param typist the typist taking this turn
+     * @param speedModifier the typing speed multiplier for this typist
+     */
+    private void typeCharactersForTurn(Typist typist, double speedModifier)
+    {
+        int attempts = 0;
+        double remainingSpeed = speedModifier;
+
+        while (remainingSpeed >= 1.0)
+        {
+            attempts++;
+            remainingSpeed = remainingSpeed - 1.0;
+        }
+
+        if (Math.random() < remainingSpeed)
+        {
+            attempts++;
+        }
+
+        for (int attempt = 0; attempt < attempts; attempt++)
+        {
+            if (Math.random() < typist.getAccuracy())
+            {
+                typist.typeCharacter();
+            }
+        }
+    }
+
+    /**
+     * Applies the late-race drawback for the Energy Drink accessory once.
+     *
+     * @param index the index of the typist
+     */
+    private void applyMidRaceEnergyDrinkPenalty(int index)
+    {
+        if (!energyDrinkBoxes[index].isSelected() ||
+            energyDrinkPenaltyApplied[index] ||
+            selectedPassage.length() == 0)
+        {
+            return;
+        }
+
+        if (currentTypists[index].getProgress() >= selectedPassage.length() / 2)
+        {
+            currentTypists[index].setAccuracy(currentTypists[index].getAccuracy() - 0.10);
+            speedModifiers[index] = speedModifiers[index] * 0.90;
+            energyDrinkPenaltyApplied[index] = true;
+        }
+    }
+
+    /**
+     * Finishes the race, stores final statistics, and enables the stats button.
+     *
+     * @param winner the winning typist
+     */
+    private void finishRace(Typist winner)
+    {
+        raceTimer.stop();
+
+        double oldAccuracy = winner.getAccuracy();
+        winner.setAccuracy(oldAccuracy + 0.02);
+
+        recordRaceStatistics();
+
+        if (viewStatsButton != null)
+        {
+            viewStatsButton.setEnabled(true);
+        }
+
+        if (raceWinnerLabel != null)
+        {
+            raceWinnerLabel.setText("<html>Winner: " + winner.getName()
+                + "<br>Accuracy Rating: " + String.format("%.2f", oldAccuracy)
+                + " -> " + String.format("%.2f", winner.getAccuracy()) + "</html>");
+        }
+    }
+
+    /**
+     * Records calculated statistics for the completed race.
+     *
+     */
+    private void recordRaceStatistics()
+    {
+        raceNumber++;
+
+        double elapsedMinutes = (System.currentTimeMillis() - raceStartTime) / 60000.0;
+        lastRacePerformances = new RacePerformance[currentTypists.length];
+        int[] positions = calculateRacePositions();
+        updateConsecutiveWins(positions);
+
+        for (int i = 0; i < currentTypists.length; i++)
+        {
+            double wordsTyped = currentTypists[i].getProgress() / 5.0;
+            double wpm = 0.0;
+
+            if (elapsedMinutes > 0)
+            {
+                wpm = wordsTyped / elapsedMinutes;
+            }
+
+            int totalAttempts = currentTypists[i].getProgress() + mistypeCounts[i];
+            double accuracyPercent = 100.0;
+
+            if (totalAttempts > 0)
+            {
+                accuracyPercent = ((double) currentTypists[i].getProgress() / totalAttempts) * 100.0;
+            }
+
+            int rewardPoints = calculateRewardPoints(positions[i], wpm, burnoutCounts[i]);
+            int coinsEarned = calculateCoinsEarned(positions[i], wpm, burnoutCounts[i], accuracyPercent, i);
+            leaderboardPoints[i] += rewardPoints;
+            totalCoins[i] += coinsEarned;
+
+            RacePerformance performance = new RacePerformance(
+                raceNumber,
+                currentTypists[i].getName(),
+                positions[i],
+                wpm,
+                accuracyPercent,
+                mistypeCounts[i],
+                burnoutCounts[i],
+                rewardPoints,
+                coinsEarned,
+                startingAccuracies[i],
+                currentTypists[i].getAccuracy()
+            );
+
+            lastRacePerformances[i] = performance;
+            typistRaceHistories[i].add(performance);
+
+            if (wpm > bestWpmRecords[i])
+            {
+                bestWpmRecords[i] = wpm;
+            }
+        }
+
+    }
+
+    /**
+     * Calculates finishing positions from progress through the final race state.
+     *
+     * @return position for each typist index
+     */
+    private int[] calculateRacePositions()
+    {
+        int[] positions = new int[currentTypists.length];
+        boolean[] assigned = new boolean[currentTypists.length];
+
+        for (int position = 1; position <= currentTypists.length; position++)
+        {
+            int bestIndex = -1;
+
+            for (int i = 0; i < currentTypists.length; i++)
+            {
+                if (!assigned[i] && (bestIndex == -1 || typistFinishedAheadOf(i, bestIndex)))
+                {
+                    bestIndex = i;
+                }
+            }
+
+            assigned[bestIndex] = true;
+            positions[bestIndex] = position;
+        }
+
+        return positions;
+    }
+
+    /**
+     * Compares two typists when assigning race positions.
+     *
+     * @param firstIndex the first typist index
+     * @param secondIndex the second typist index
+     * @return true if the first typist should be placed ahead
+     */
+    private boolean typistFinishedAheadOf(int firstIndex, int secondIndex)
+    {
+        if (currentTypists[firstIndex].getProgress() != currentTypists[secondIndex].getProgress())
+        {
+            return currentTypists[firstIndex].getProgress() > currentTypists[secondIndex].getProgress();
+        }
+
+        if (mistypeCounts[firstIndex] != mistypeCounts[secondIndex])
+        {
+            return mistypeCounts[firstIndex] < mistypeCounts[secondIndex];
+        }
+
+        if (burnoutCounts[firstIndex] != burnoutCounts[secondIndex])
+        {
+            return burnoutCounts[firstIndex] < burnoutCounts[secondIndex];
+        }
+
+        if (currentTypists[firstIndex].getAccuracy() != currentTypists[secondIndex].getAccuracy())
+        {
+            return currentTypists[firstIndex].getAccuracy() > currentTypists[secondIndex].getAccuracy();
+        }
+
+        return firstIndex < secondIndex;
+    }
+
+    /**
+     * Updates consecutive win counts after a race.
+     *
+     * @param positions finishing positions
+     */
+    private void updateConsecutiveWins(int[] positions)
+    {
+        for (int i = 0; i < positions.length; i++)
+        {
+            if (positions[i] == 1)
+            {
+                consecutiveWinCounts[i]++;
+            }
+            else
+            {
+                consecutiveWinCounts[i] = 0;
+            }
+        }
+    }
+
+    /**
+     * Calculates leaderboard reward points for one typist in one race.
+     *
+     * @param position finishing position
+     * @param wpm words per minute
+     * @param burnouts burnout count
+     * @return reward points earned
+     */
+    private int calculateRewardPoints(int position, double wpm, int burnouts)
+    {
+        int points = 0;
+
+        if (position == 1)
+        {
+            points = 3;
+        }
+        else if (position == 2)
+        {
+            points = 2;
+        }
+        else if (position == 3)
+        {
+            points = 1;
+        }
+
+        if (wpm >= 25.0)
+        {
+            points++;
+        }
+
+        if (burnouts == 0)
+        {
+            points++;
+        }
+
+        return points;
+    }
+
+    /**
+     * Calculates race prize money for one typist.
+     *
+     * @param position finishing position
+     * @param wpm words per minute
+     * @param burnouts burnout count
+     * @param accuracyPercent race accuracy percentage
+     * @param typistIndex typist index
+     * @return coins earned
+     */
+    private int calculateCoinsEarned(
+        int position,
+        double wpm,
+        int burnouts,
+        double accuracyPercent,
+        int typistIndex)
+    {
+        int[] basePrizes = {35, 25, 18, 12, 8, 5};
+        int coins = basePrizes[Math.min(position - 1, basePrizes.length - 1)];
+
+        if (wpm >= 35.0)
+        {
+            coins += 15;
+        }
+        else if (wpm >= 25.0)
+        {
+            coins += 8;
+        }
+
+        coins -= burnouts * 3;
+        coins += calculateSponsorBonus(savedSponsors[typistIndex], position, wpm, burnouts, accuracyPercent);
+
+        return Math.max(coins, 0);
+    }
+
+    /**
+     * Calculates sponsor bonus coins for one race.
+     *
+     * @param sponsor selected sponsor
+     * @param position finishing position
+     * @param wpm words per minute
+     * @param burnouts burnout count
+     * @param accuracyPercent race accuracy percentage
+     * @return sponsor bonus coins
+     */
+    private int calculateSponsorBonus(
+        String sponsor,
+        int position,
+        double wpm,
+        int burnouts,
+        double accuracyPercent)
+    {
+        if (sponsor == null || sponsorOptions[0].equals(sponsor))
+        {
+            return 0;
+        }
+
+        if (sponsor.equals(sponsorOptions[1]) && burnouts == 0)
+        {
+            return 15;
+        }
+        else if (sponsor.equals(sponsorOptions[2]) && wpm >= 30.0)
+        {
+            return 15;
+        }
+        else if (sponsor.equals(sponsorOptions[3]) && savedSeatCount >= 4 && position <= 3)
+        {
+            return 12;
+        }
+        else if (sponsor.equals(sponsorOptions[4]) && accuracyPercent >= 90.0)
+        {
+            return 10;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Builds Typist objects from the current GUI customisation choices.
+     *
+     * @return an array of Typist objects
+     */
+    private Typist[] createTypistsFromGUI()
+    {
+        int seatCount = (Integer) seatCountSpinner.getValue();
+        Typist[] typists = new Typist[seatCount];
+
+        for (int i = 0; i < seatCount; i++)
+        {
+            String name = typistNames[i];
+            String selectedSymbol = (String) symbolBoxes[i].getSelectedItem();
+            char symbol = getSymbolGlyph(selectedSymbol).charAt(0);
+
+            double accuracy = 0.70;
+            speedModifiers[i] = 1.00;
+            mistypeRateModifiers[i] = 1.00;
+            burnoutChanceModifiers[i] = 1.00;
+            burnoutDurationModifiers[i] = 0;
+
+            String typingStyle = (String) typingStyleBoxes[i].getSelectedItem();
+            String keyboardType = (String) keyboardTypeBoxes[i].getSelectedItem();
+
+            if ("Touch Typist".equals(typingStyle))
+            {
+                accuracy = accuracy + 0.10;
+                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 0.90;
+            }
+            else if ("Hunt & Peck".equals(typingStyle))
+            {
+                accuracy = accuracy - 0.10;
+                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 0.80;
+            }
+            else if ("Phone Thumbs".equals(typingStyle))
+            {
+                accuracy = accuracy - 0.05;
+                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 1.25;
+                burnoutDurationModifiers[i] = burnoutDurationModifiers[i] + 1;
+            }
+            else if ("Voice-to-Text".equals(typingStyle))
+            {
+                accuracy = accuracy + 0.05;
+                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 1.10;
+            }
+
+            if ("Mechanical".equals(keyboardType))
+            {
+                speedModifiers[i] = speedModifiers[i] * 1.15;
+                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 0.90;
+            }
+            else if ("Ergonomic".equals(keyboardType))
+            {
+                accuracy = accuracy + 0.03;
+                speedModifiers[i] = speedModifiers[i] * 1.05;
+                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 0.85;
+            }
+            else if ("Optical".equals(keyboardType))
+            {
+                speedModifiers[i] = speedModifiers[i] * 1.25;
+                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.08;
+            }
+            else if ("Membrane".equals(keyboardType))
+            {
+                speedModifiers[i] = speedModifiers[i] * 0.95;
+                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.00;
+            }
+            else if ("Touchscreen".equals(keyboardType))
+            {
+                speedModifiers[i] = speedModifiers[i] * 0.90;
+                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.30;
+            }
+            else if ("Stenography".equals(keyboardType))
+            {
+                speedModifiers[i] = speedModifiers[i] * 1.35;
+                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.20;
+            }
+
+            if (nightShiftCheckBox.isSelected())
+            {
+                accuracy = accuracy - 0.05;
+                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.15;
+            }
+
+            if (caffeineModeCheckBox.isSelected())
+            {
+                accuracy = accuracy + 0.03;
+                speedModifiers[i] = speedModifiers[i] * 1.10;
+            }
+
+            if (energyDrinkBoxes[i].isSelected())
+            {
+                accuracy = accuracy + 0.05;
+                speedModifiers[i] = speedModifiers[i] * 1.08;
+            }
+
+            if (coolingFanBoxes[i].isSelected())
+            {
+                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 0.92;
+            }
+
+            typists[i] = new Typist(symbol, name, accuracy);
+        }
+
+        return typists;
+    }
+
+    /**
+     * Saves the current configuration and typist customisation options.
+     */
+    private void saveCurrentOptions()
+    {
+        if (updatingSymbols)
+        {
+            return;
+        }
+
+        if (seatCountSpinner != null)
+        {
+            savedSeatCount = (Integer) seatCountSpinner.getValue();
+        }
+
+        if (passageComboBox != null)
+        {
+            savedPassageIndex = passageComboBox.getSelectedIndex();
+        }
+
+        if (customPassageArea != null)
+        {
+            if (showingCustomPassagePlaceholder)
+            {
+                savedCustomPassage = "";
+            }
+            else
+            {
+                savedCustomPassage = customPassageArea.getText();
+            }
+        }
+
+        if (autocorrectCheckBox != null)
+        {
+            savedAutocorrectSelected = autocorrectCheckBox.isSelected();
+        }
+
+        if (caffeineModeCheckBox != null)
+        {
+            savedCaffeineModeSelected = caffeineModeCheckBox.isSelected();
+        }
+
+        if (nightShiftCheckBox != null)
+        {
+            savedNightShiftSelected = nightShiftCheckBox.isSelected();
+        }
+
+        int count = savedSeatCount;
+
+        for (int i = 0; i < count && i < typistNames.length; i++)
+        {
+            if (typingStyleBoxes != null && i < typingStyleBoxes.length && typingStyleBoxes[i] != null)
+            {
+                savedTypingStyles[i] = (String) typingStyleBoxes[i].getSelectedItem();
+            }
+
+            if (keyboardTypeBoxes != null && i < keyboardTypeBoxes.length && keyboardTypeBoxes[i] != null)
+            {
+                savedKeyboardTypes[i] = (String) keyboardTypeBoxes[i].getSelectedItem();
+            }
+
+            if (symbolBoxes != null && i < symbolBoxes.length && symbolBoxes[i] != null &&
+                symbolBoxes[i].getSelectedItem() != null)
+            {
+                savedSymbols[i] = (String) symbolBoxes[i].getSelectedItem();
+            }
+
+            if (colourBoxes != null && i < colourBoxes.length && colourBoxes[i] != null &&
+                colourBoxes[i].getSelectedItem() != null)
+            {
+                savedColours[i] = (String) colourBoxes[i].getSelectedItem();
+            }
+
+            if (sponsorBoxes != null && i < sponsorBoxes.length && sponsorBoxes[i] != null &&
+                sponsorBoxes[i].getSelectedItem() != null)
+            {
+                savedSponsors[i] = (String) sponsorBoxes[i].getSelectedItem();
+            }
+
+            if (wristSupportBoxes != null && i < wristSupportBoxes.length && wristSupportBoxes[i] != null)
+            {
+                savedWristSupports[i] = wristSupportBoxes[i].isSelected();
+            }
+
+            if (energyDrinkBoxes != null && i < energyDrinkBoxes.length && energyDrinkBoxes[i] != null)
+            {
+                savedEnergyDrinks[i] = energyDrinkBoxes[i].isSelected();
+            }
+
+            if (noiseCancellingBoxes != null && i < noiseCancellingBoxes.length && noiseCancellingBoxes[i] != null)
+            {
+                savedNoiseCancelling[i] = noiseCancellingBoxes[i].isSelected();
+            }
+
+            if (postureSeatBoxes != null && i < postureSeatBoxes.length && postureSeatBoxes[i] != null)
+            {
+                savedPostureSeats[i] = postureSeatBoxes[i].isSelected();
+            }
+
+            if (coolingFanBoxes != null && i < coolingFanBoxes.length && coolingFanBoxes[i] != null)
+            {
+                savedCoolingFans[i] = coolingFanBoxes[i].isSelected();
+            }
+        }
+    }
+
+    /**
+     * Updates the currently selected passage.
+     * Enables custom input when selected and updates the passage length label.
+     */
+    private void updateSelectedPassage()
+    {
+        String selectedOption = (String) passageComboBox.getSelectedItem();
+
+        if ("Custom Passage".equals(selectedOption))
+        {
+            customPassageArea.setEnabled(true);
+            selectedPassage = getCustomPassageText();
+
+            if (selectedPassage.isEmpty() && !customPassageArea.hasFocus())
+            {
+                showCustomPassagePlaceholder();
+            }
+        }
+        else
+        {
+            customPassageArea.setEnabled(false);
+            selectedPassage = selectedOption.substring(selectedOption.indexOf(":") + 2);
+            if (customPassageArea.getText().trim().isEmpty())
+            {
+                showCustomPassagePlaceholder();
+            }
+        }
+
+        passageLengthLabel.setText("Passage length: " + selectedPassage.length() + " characters");
+    }
+
+    /**
+     * Gets the custom passage text while ignoring placeholder text.
+     *
+     * @return the custom passage typed by the user
+     */
+    private String getCustomPassageText()
+    {
+        if (showingCustomPassagePlaceholder)
+        {
+            return "";
+        }
+
+        return customPassageArea.getText();
+    }
+
+    /**
+     * Displays muted placeholder text in the custom passage area.
+     */
+    private void showCustomPassagePlaceholder()
+    {
+        showingCustomPassagePlaceholder = true;
+        customPassageArea.setForeground(TEXT_MUTED);
+        customPassageArea.setText(CUSTOM_PASSAGE_PLACEHOLDER);
+    }
+
+    /**
+     * Clears placeholder text when the user starts typing a custom passage.
+     */
+    private void clearCustomPassagePlaceholder()
+    {
+        if (showingCustomPassagePlaceholder)
+        {
+            showingCustomPassagePlaceholder = false;
+            customPassageArea.setText("");
+            customPassageArea.setForeground(TEXT_LIGHT);
+        }
+    }
+
+    /**
+     * Updates the list of active racers shown beside the seat count spinner.
+     */
+    private void updateActiveRacersLabel()
+    {
+        if (activeRacersLabel == null || seatCountSpinner == null)
+        {
+            return;
+        }
+
+        int count = (Integer) seatCountSpinner.getValue();
+        String text = "<html><span style=\"color:" + toHex(TEXT_MUTED) + ";\">Racers: </span>";
+
+        for (int i = 0; i < count; i++)
+        {
+            if (i > 0)
+            {
+                text += "<span style=\"color:" + toHex(TEXT_MUTED) + ";\"> &nbsp; </span>";
+            }
+
+            text += "<span style=\"font-family:'Segoe UI Symbol'; color:"
+                + toHex(getTypistDisplayColour(i)) + ";\">"
+                + getTypistDisplaySymbol(i) + "</span> "
+                + "<span style=\"color:" + toHex(getTypistDisplayColour(i)) + ";\">"
+                + typistNames[i] + "</span>";
+        }
+
+        activeRacersLabel.setText(text + "</html>");
+    }
+
+    /**
+     * Updates the impact label for selected difficulty modifiers.
+     */
+    private void updateDifficultyImpact()
+    {
+        String impact = "Impact: ";
+
+        if (autocorrectCheckBox.isSelected())
+        {
+            impact += "Slide back amount is reduced. ";
+        }
+
+        if (caffeineModeCheckBox.isSelected())
+        {
+            impact += "Higher speed and accuracy, higher burnout risk. ";
+        }
+
+        if (nightShiftCheckBox.isSelected())
+        {
+            impact += "Accuracy reduced, mistype rate increased. ";
+        }
+
+        if (!autocorrectCheckBox.isSelected() &&
+            !caffeineModeCheckBox.isSelected() &&
+            !nightShiftCheckBox.isSelected())
+        {
+            impact += "No difficulty modifiers selected.";
+        }
+
+        difficultyImpactLabel.setText(impact);
+    }
+
+    /**
+     * Clears sponsor choices that are invalid for the current race size.
+     */
+    private void validateSavedSponsors()
+    {
+        if (savedSponsors == null)
+        {
+            return;
+        }
+
+        if (savedSeatCount < 4)
+        {
+            for (int i = 0; i < savedSponsors.length; i++)
+            {
+                if (sponsorOptions[3].equals(savedSponsors[i]))
+                {
+                    savedSponsors[i] = sponsorOptions[0];
+                }
+            }
+        }
+    }
+
+    /**
+     * Gets sponsor options available for the current race size.
+     *
+     * @return available sponsor options
+     */
+    private String[] getAvailableSponsorOptions()
+    {
+        if (savedSeatCount >= 4)
+        {
+            return sponsorOptions;
+        }
+
+        return new String[] {
+            sponsorOptions[0],
+            sponsorOptions[1],
+            sponsorOptions[2],
+            sponsorOptions[4]
+        };
+    }
+
+    /**
+     * Buys an upgrade for one typist if they can afford it.
+     *
+     * @param typistIndex typist index
+     * @param upgradeIndex upgrade index
+     */
+    private void buyUpgrade(int typistIndex, int upgradeIndex)
+    {
+        if (ownedUpgrades[typistIndex][upgradeIndex] ||
+            totalCoins[typistIndex] < shopUpgradeCosts[upgradeIndex])
+        {
+            return;
+        }
+
+        totalCoins[typistIndex] -= shopUpgradeCosts[upgradeIndex];
+        ownedUpgrades[typistIndex][upgradeIndex] = true;
+        selectedMainTabIndex = 2;
+        frame.setContentPane(createWindowContent(createMainPanel()));
+        frame.revalidate();
+        frame.repaint();
+    }
+
+    /**
+     * Updates the typist tabs based on the selected number of racers.
+     */
+    @SuppressWarnings("unchecked")
+    private void updateTypistTabs()
+    {
+        if (typistTabbedPane == null || seatCountSpinner == null)
+        {
+            return;
+        }
+
+        saveCurrentOptions();
+        int count = (Integer) seatCountSpinner.getValue();
+
+        typingStyleBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
+        keyboardTypeBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
+        symbolBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
+        colourBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
+        sponsorBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
+        wristSupportBoxes = new JCheckBox[count];
+        energyDrinkBoxes = new JCheckBox[count];
+        noiseCancellingBoxes = new JCheckBox[count];
+        postureSeatBoxes = new JCheckBox[count];
+        coolingFanBoxes = new JCheckBox[count];
+        impactLabels = new JLabel[count];
+        typingStyleImpactLabels = new JLabel[count];
+        keyboardTypeImpactLabels = new JLabel[count];
+
+        typistTabbedPane.removeAll();
+
+        for (int i = 0; i < count; i++)
+        {
+            String hex = toHex(getSelectedColourSafe(i));
+            String symbolGlyph = getSymbolGlyph(availableSymbols[i]);
+
+            typistTabbedPane.addTab(
+                typistNames[i],
+                createTypistScrollPane(i)
+            );
+            typistTabbedPane.setTabComponentAt(i,
+                createTypistTabLabel(symbolGlyph, typistNames[i], hex)
+            );
+        }
+
+        updateSymbolAvailability();
+        updateColourAvailability();
+        updateActiveRacersLabel();
+
+        typistTabbedPane.revalidate();
+        typistTabbedPane.repaint();
+    }
+
+    /**
+     * Updates the visible typing style impact text.
+     *
+     * @param index the index of the typist
+     */
+    private void updateTypingStyleImpact(int index)
+    {
+        if (typingStyleImpactLabels == null || typingStyleImpactLabels[index] == null)
+        {
+            return;
+        }
+
+        typingStyleImpactLabels[index].setText(
+            "Impact: " + getTypingStyleImpact((String) typingStyleBoxes[index].getSelectedItem())
+        );
+    }
+
+    /**
+     * Updates the visible keyboard type impact text.
+     *
+     * @param index the index of the typist
+     */
+    private void updateKeyboardTypeImpact(int index)
+    {
+        if (keyboardTypeImpactLabels == null || keyboardTypeImpactLabels[index] == null)
+        {
+            return;
+        }
+
+        keyboardTypeImpactLabels[index].setText(
+            "Impact: " + getKeyboardTypeImpact((String) keyboardTypeBoxes[index].getSelectedItem())
+        );
+    }
+
+    /**
+     * Gets the impact text for a typing style.
+     *
+     * @param typingStyle the selected typing style
+     * @return the impact description
+     */
+    private String getTypingStyleImpact(String typingStyle)
+    {
+        if ("Touch Typist".equals(typingStyle))
+        {
+            return "Higher accuracy, slightly lower burnout risk.";
+        }
+        else if ("Hunt & Peck".equals(typingStyle))
+        {
+            return "Lower accuracy, lower burnout risk.";
+        }
+        else if ("Phone Thumbs".equals(typingStyle))
+        {
+            return "Lower accuracy, higher and longer burnout risk.";
+        }
+        else if ("Voice-to-Text".equals(typingStyle))
+        {
+            return "Higher accuracy, slightly higher burnout risk.";
+        }
+
+        return "Balanced accuracy and burnout profile.";
+    }
+
+    /**
+     * Gets the impact text for a keyboard type.
+     *
+     * @param keyboardType the selected keyboard type
+     * @return the impact description
+     */
+    private String getKeyboardTypeImpact(String keyboardType)
+    {
+        if ("Membrane".equals(keyboardType))
+        {
+            return "Starter keyboard with steady but slightly slower speed.";
+        }
+        else if ("Mechanical".equals(keyboardType))
+        {
+            return "Faster typing speed, lower mistype rate.";
+        }
+        else if ("Ergonomic".equals(keyboardType))
+        {
+            return "Slightly faster, better accuracy, lower burnout risk.";
+        }
+        else if ("Optical".equals(keyboardType))
+        {
+            return "Very fast typing speed with a small mistype trade-off.";
+        }
+        else if ("Membrane".equals(keyboardType))
+        {
+            return "Slightly slower speed, steady mistype rate.";
+        }
+        else if ("Touchscreen".equals(keyboardType))
+        {
+            return "Slower speed, higher mistype rate.";
+        }
+        else if ("Stenography".equals(keyboardType))
+        {
+            return "Much faster speed, higher mistype rate.";
+        }
+
+        return "Steady typing speed and mistype rate.";
+    }
+
+    /**
+     * Updates all colour dropdowns so a colour already used by one typist
+     * cannot be selected by another typist.
+     */
+    private void updateColourAvailability()
+    {
+        if (updatingSymbols || colourBoxes == null)
+        {
+            return;
+        }
+
+        updatingSymbols = true;
+
+        int count = (Integer) seatCountSpinner.getValue();
+        String[] selectedColours = new String[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            if (colourBoxes[i] != null)
+            {
+                selectedColours[i] = (String) colourBoxes[i].getSelectedItem();
+            }
+        }
+
+        removeDuplicateSelections(selectedColours, availableColours);
+
+        for (int i = 0; i < count; i++)
+        {
+            if (colourBoxes[i] != null)
+            {
+                String currentColour = selectedColours[i];
+
+                colourBoxes[i].removeAllItems();
+
+                for (String colour : availableColours)
+                {
+                    if (colour.equals(currentColour) || !optionIsUsedByAnotherTypist(colour, selectedColours, i))
+                    {
+                        colourBoxes[i].addItem(colour);
+                    }
+                }
+
+                colourBoxes[i].setSelectedItem(currentColour);
+                colourBoxes[i].setRenderer(new ColourComboBoxRenderer());
+                colourBoxes[i].setForeground(getSelectedColourSafe(i));
+                symbolBoxes[i].setRenderer(new SymbolComboBoxRenderer(i));
+                symbolBoxes[i].setForeground(getSelectedColourSafe(i));
+
+                String currentSymbol = (String) symbolBoxes[i].getSelectedItem();
+                String hex = toHex(getSelectedColourSafe(i));
+
+                typistTabbedPane.setTabComponentAt(i,
+                    createTypistTabLabel(getSymbolGlyph(currentSymbol), typistNames[i], hex)
+                );
+            }
+        }
+
+        updatingSymbols = false;
+        updateActiveRacersLabel();
+        saveCurrentOptions();
+    }
+
+    /**
+     * Updates all symbol dropdowns so a symbol already used by one typist
+     * cannot be selected by another typist.
+     */
+    private void updateSymbolAvailability()
+    {
+        if (updatingSymbols || symbolBoxes == null)
+        {
+            return;
+        }
+
+        updatingSymbols = true;
+
+        int count = (Integer) seatCountSpinner.getValue();
+        String[] selectedSymbols = new String[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            if (symbolBoxes[i] != null)
+            {
+                selectedSymbols[i] = (String) symbolBoxes[i].getSelectedItem();
+            }
+        }
+
+        removeDuplicateSelections(selectedSymbols, availableSymbols);
+
+        for (int i = 0; i < count; i++)
+        {
+            if (symbolBoxes[i] != null)
+            {
+                String currentSymbol = selectedSymbols[i];
+
+                symbolBoxes[i].removeAllItems();
+
+                for (String symbol : availableSymbols)
+                {
+                    if (symbol.equals(currentSymbol) || !optionIsUsedByAnotherTypist(symbol, selectedSymbols, i))
+                    {
+                        symbolBoxes[i].addItem(symbol);
+                    }
+                }
+
+                symbolBoxes[i].setSelectedItem(currentSymbol);
+                symbolBoxes[i].setRenderer(new SymbolComboBoxRenderer(i));
+                symbolBoxes[i].setForeground(getSelectedColourSafe(i));
+
+                String hex = toHex(getSelectedColourSafe(i));
+
+                typistTabbedPane.setTabComponentAt(i,
+                    createTypistTabLabel(getSymbolGlyph(currentSymbol), typistNames[i], hex)
+                );
+            }
+        }
+
+        updatingSymbols = false;
+        updateActiveRacersLabel();
+        saveCurrentOptions();
+    }
+
+    /**
+     * Replaces duplicate selections with the next available option.
+     *
+     * @param selections currently selected options
+     * @param availableOptions all possible options
+     */
+    private void removeDuplicateSelections(String[] selections, String[] availableOptions)
+    {
+        for (int i = 0; i < selections.length; i++)
+        {
+            if (selectionIsUsedEarlier(selections[i], selections, i))
+            {
+                selections[i] = getNextAvailableOption(selections[i], selections, availableOptions, i);
+            }
+        }
+    }
+
+    /**
+     * Checks whether an option has already been chosen by an earlier typist.
+     *
+     * @param selection selected option
+     * @param selections all selected options
+     * @param currentIndex current typist index
+     * @return true if an earlier typist already uses the option
+     */
+    private boolean selectionIsUsedEarlier(String selection, String[] selections, int currentIndex)
+    {
+        if (selection == null)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < currentIndex; i++)
+        {
+            if (selection.equals(selections[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Gets the next option not already used by another typist.
+     *
+     * @param currentOption the duplicated option
+     * @param selections all selected options
+     * @param availableOptions all possible options
+     * @param currentIndex current typist index
+     * @return next available option
+     */
+    private String getNextAvailableOption(
+        String currentOption,
+        String[] selections,
+        String[] availableOptions,
+        int currentIndex)
+    {
+        int startIndex = getOptionIndex(currentOption, availableOptions);
+
+        for (int offset = 1; offset <= availableOptions.length; offset++)
+        {
+            String option = availableOptions[(startIndex + offset) % availableOptions.length];
+
+            if (!optionIsUsedByAnotherTypist(option, selections, currentIndex))
+            {
+                return option;
+            }
+        }
+
+        return currentOption;
+    }
+
+    /**
+     * Finds an option's index in the available option list.
+     *
+     * @param option option to find
+     * @param availableOptions all possible options
+     * @return option index, or 0 if not found
+     */
+    private int getOptionIndex(String option, String[] availableOptions)
+    {
+        for (int i = 0; i < availableOptions.length; i++)
+        {
+            if (availableOptions[i].equals(option))
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Checks whether an option is selected by another typist.
+     *
+     * @param option option to check
+     * @param selections all selected options
+     * @param currentIndex current typist index
+     * @return true if another typist uses the option
+     */
+    private boolean optionIsUsedByAnotherTypist(String option, String[] selections, int currentIndex)
+    {
+        for (int i = 0; i < selections.length; i++)
+        {
+            if (i != currentIndex && option.equals(selections[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Gets keyboard options unlocked for a typist.
+     *
+     * @param index the typist index
+     * @return unlocked keyboard type names
+     */
+    private String[] getAvailableKeyboardTypes(int index)
+    {
+        ArrayList<String> keyboardTypes = new ArrayList<>();
+        keyboardTypes.add("Membrane");
+
+        for (int i = 0; i < keyboardUpgrades.length; i++)
+        {
+            if (ownedUpgrades[index][i])
+            {
+                keyboardTypes.add(keyboardUpgrades[i]);
+            }
+        }
+
+        return keyboardTypes.toArray(new String[0]);
+    }
+
+    /**
+     * Updates the impact label for one typist based on selected customisation options.
+     *
+     * @param index the index of the typist
+     */
+    private void updateTypistImpact(int index)
+    {
+        String impact = "Impact: ";
+
+        if (wristSupportBoxes[index].isSelected())
+        {
+            impact += "Lower burnout duration. ";
+        }
+
+        if (energyDrinkBoxes[index].isSelected())
+        {
+            impact += "Higher early accuracy and speed, lower later accuracy and speed. ";
+        }
+
+        if (noiseCancellingBoxes[index].isSelected())
+        {
+            impact += "Reduced mistype chance. ";
+        }
+
+        if (postureSeatBoxes[index].isSelected())
+        {
+            impact += "Lower burnout chance. ";
+        }
+
+        if (coolingFanBoxes[index].isSelected())
+        {
+            impact += "Lower burnout duration and late-race fatigue. ";
+        }
+
+        if (!wristSupportBoxes[index].isSelected() &&
+            !energyDrinkBoxes[index].isSelected() &&
+            !noiseCancellingBoxes[index].isSelected() &&
+            !postureSeatBoxes[index].isSelected() &&
+            !coolingFanBoxes[index].isSelected())
+        {
+            impact += "No accessories selected.";
+        }
+
+        impactLabels[index].setText(impact);
+    }
+
+    /**
+     * Gets last race performances ordered by finishing position.
+     *
+     * @return ordered race performance data
+     */
+    private RacePerformance[] getLastRacePerformancesByPosition()
+    {
+        RacePerformance[] orderedPerformances = new RacePerformance[lastRacePerformances.length];
+
+        for (int i = 0; i < lastRacePerformances.length; i++)
+        {
+            orderedPerformances[i] = lastRacePerformances[i];
+        }
+
+        for (int i = 0; i < orderedPerformances.length - 1; i++)
+        {
+            for (int j = i + 1; j < orderedPerformances.length; j++)
+            {
+                if (orderedPerformances[j].position < orderedPerformances[i].position)
+                {
+                    RacePerformance temp = orderedPerformances[i];
+                    orderedPerformances[i] = orderedPerformances[j];
+                    orderedPerformances[j] = temp;
+                }
+            }
+        }
+
+        return orderedPerformances;
+    }
+
+    /**
+     * Gets typist indexes ordered by cumulative leaderboard score.
+     *
+     * @return ordered typist indexes
+     */
+    private int[] getLeaderboardOrder()
+    {
+        int[] orderedIndexes = new int[typistNames.length];
+
+        for (int i = 0; i < orderedIndexes.length; i++)
+        {
+            orderedIndexes[i] = i;
+        }
+
+        for (int i = 0; i < orderedIndexes.length - 1; i++)
+        {
+            for (int j = i + 1; j < orderedIndexes.length; j++)
+            {
+                if (leaderboardRankedAheadOf(orderedIndexes[j], orderedIndexes[i]))
+                {
+                    int temp = orderedIndexes[i];
+                    orderedIndexes[i] = orderedIndexes[j];
+                    orderedIndexes[j] = temp;
+                }
+            }
+        }
+
+        return orderedIndexes;
+    }
+
+    /**
+     * Compares typists for leaderboard ranking.
+     *
+     * @param firstIndex first typist index
+     * @param secondIndex second typist index
+     * @return true if the first typist ranks ahead
+     */
+    private boolean leaderboardRankedAheadOf(int firstIndex, int secondIndex)
+    {
+        if (leaderboardPoints[firstIndex] != leaderboardPoints[secondIndex])
+        {
+            return leaderboardPoints[firstIndex] > leaderboardPoints[secondIndex];
+        }
+
+        if (totalCoins[firstIndex] != totalCoins[secondIndex])
+        {
+            return totalCoins[firstIndex] > totalCoins[secondIndex];
+        }
+
+        if (bestWpmRecords[firstIndex] != bestWpmRecords[secondIndex])
+        {
+            return bestWpmRecords[firstIndex] > bestWpmRecords[secondIndex];
+        }
+
+        return firstIndex < secondIndex;
+    }
+
+    /**
+     * Gets the most recent Accuracy Rating for a typist.
+     *
+     * @param index typist index
+     * @return latest recorded Accuracy Rating
+     */
+    private double getLatestSkillAccuracy(int index)
+    {
+        ArrayList<RacePerformance> history = typistRaceHistories[index];
+
+        if (history.isEmpty())
+        {
+            return 0.0;
+        }
+
+        return history.get(history.size() - 1).skillAccuracy;
+    }
+
+    /**
+     * Gets a leaderboard title from cumulative point milestones.
+     *
+     * @param index typist index
+     * @return current title
+     */
+    private String getLeaderboardTitle(int index)
+    {
+        if (leaderboardPoints[index] >= 20)
+        {
+            return "Track Champion";
+        }
+        else if (leaderboardPoints[index] >= 10)
+        {
+            return "Podium Regular";
+        }
+        else if (leaderboardPoints[index] >= 5)
+        {
+            return "Rising Racer";
+        }
+
+        return "Rookie";
+    }
+
+    /**
+     * Gets all badges earned from race milestones.
+     *
+     * @param index typist index
+     * @return milestone badges
+     */
+    private String getLeaderboardBadges(int index)
+    {
+        ArrayList<String> badges = new ArrayList<>();
+
+        if (consecutiveWinCounts[index] >= 3)
+        {
+            badges.add("Speed Demon");
+        }
+
+        if (bestWpmRecords[index] >= 30.0)
+        {
+            badges.add("Rapid Keys");
+        }
+
+        if (typistHasBurnoutFreeStreak(index, 5))
+        {
+            badges.add("Iron Fingers");
+        }
+
+        if (badges.isEmpty())
+        {
+            return "-";
+        }
+
+        return String.join(", ", badges);
+    }
+
+    /**
+     * Checks whether a typist has a burnout-free streak.
+     *
+     * @param index typist index
+     * @param streakLength required streak length
+     * @return true if the streak exists
+     */
+    private boolean typistHasBurnoutFreeStreak(int index, int streakLength)
+    {
+        ArrayList<RacePerformance> history = typistRaceHistories[index];
+
+        if (history.size() < streakLength)
+        {
+            return false;
+        }
+
+        for (int i = history.size() - streakLength; i < history.size(); i++)
+        {
+            if (history.get(i).burnouts > 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Finds one typist's performance for a specific race.
+     *
+     * @param typistIndex the typist index
+     * @param targetRaceNumber the race number to find
+     * @return the matching performance, or null if no data exists
+     */
+    private RacePerformance findPerformanceForRace(int typistIndex, int targetRaceNumber)
+    {
+        for (RacePerformance performance : typistRaceHistories[typistIndex])
+        {
+            if (performance.raceNumber == targetRaceNumber)
+            {
+                return performance;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Gets formatted metric data for one race performance.
+     *
+     * @param performance the performance record
+     * @param metric the selected metric
+     * @return formatted metric value
+     */
+    private Object getMetricValue(RacePerformance performance, String metric)
+    {
+        if ("Race Accuracy %".equals(metric))
+        {
+            return formatDouble(performance.accuracyPercent) + "%";
+        }
+        else if ("Accuracy Rating".equals(metric))
+        {
+            return formatDouble(performance.skillAccuracy);
+        }
+        else if ("Burnouts".equals(metric))
+        {
+            return performance.burnouts;
+        }
+        else if ("Mistypes".equals(metric))
+        {
+            return performance.mistypes;
+        }
+        else if ("Position".equals(metric))
+        {
+            return performance.position;
+        }
+        else if ("Accuracy Rating \u0394".equals(metric))
+        {
+            return formatSignedDouble(performance.accuracyChange);
+        }
+
+        return formatDouble(performance.wpm);
+    }
+
+    /**
+     * Gets numeric metric data for charts.
+     *
+     * @param performance the performance record
+     * @param metric the selected metric
+     * @return numeric metric value
+     */
+    private double getChartMetricValue(RacePerformance performance, String metric)
+    {
+        if ("Race Accuracy %".equals(metric))
+        {
+            return performance.accuracyPercent;
+        }
+        else if ("Accuracy Rating".equals(metric))
+        {
+            return performance.skillAccuracy;
+        }
+        else if ("Burnouts".equals(metric))
+        {
+            return performance.burnouts;
+        }
+        else if ("Mistypes".equals(metric))
+        {
+            return performance.mistypes;
+        }
+        else if ("Position".equals(metric))
+        {
+            return performance.position;
+        }
+        else if ("Accuracy Rating \u0394".equals(metric))
+        {
+            return performance.accuracyChange;
+        }
+
+        return performance.wpm;
+    }
+
+    /**
+     * Counts selected check boxes.
+     *
+     * @param boxes the check boxes to count
+     * @return the selected count
+     */
+    private int countSelectedBoxes(JCheckBox[] boxes)
+    {
+        int count = 0;
+
+        for (JCheckBox box : boxes)
+        {
+            if (box.isSelected())
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Counts typists who have at least one race result.
+     *
+     * @return the number of typists with recorded race data
+     */
+    private int countTypistsWithRaceData()
+    {
+        int count = 0;
+
+        for (ArrayList<RacePerformance> history : typistRaceHistories)
+        {
+            if (!history.isEmpty())
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Counts all race history rows.
+     *
+     * @return the total number of stored performance rows
+     */
+    private int countRaceHistoryRows()
+    {
+        int count = 0;
+
+        for (ArrayList<RacePerformance> history : typistRaceHistories)
+        {
+            count += history.size();
+        }
+
+        return count;
+    }
+
+    /**
+     * Gets indexes for typists with recorded race data.
+     *
+     * @return typist indexes with race history
+     */
+    private int[] getTypistsWithRaceData()
+    {
+        int[] indexes = new int[countTypistsWithRaceData()];
+        int row = 0;
+
+        for (int i = 0; i < typistRaceHistories.length; i++)
+        {
+            if (!typistRaceHistories[i].isEmpty())
+            {
+                indexes[row] = i;
+                row++;
+            }
+        }
+
+        return indexes;
+    }
+
+    /**
+     * Builds a row for a full performance table.
+     *
+     * @param performance the performance record
+     * @return table row data
+     */
+    private Object[] createPerformanceRow(RacePerformance performance)
+    {
+        return new Object[] {
+            performance.position,
+            performance.typistName,
+            formatDouble(performance.wpm),
+            formatDouble(performance.accuracyPercent) + "%",
+            performance.mistypes,
+            performance.burnouts,
+            performance.rewardPoints,
+            performance.coinsEarned,
+            formatSignedDouble(performance.accuracyChange)
+        };
+    }
+
+    /**
+     * Replaces the content inside a holder panel.
+     *
+     * @param holder the panel receiving new content
+     * @param content the new content panel
+     */
+    private void replacePanelContent(JPanel holder, JPanel content)
+    {
+        holder.removeAll();
+        holder.add(content, BorderLayout.CENTER);
+        holder.revalidate();
+        holder.repaint();
+    }
+
+    /**
+     * Formats a double to two decimal places.
+     *
+     * @param value the value to format
+     * @return formatted value
+     */
+    private String formatDouble(double value)
+    {
+        return String.format("%.2f", value);
+    }
+
+    /**
+     * Formats a signed double to two decimal places.
+     *
+     * @param value the value to format
+     * @return formatted signed value
+     */
+    private String formatSignedDouble(double value)
+    {
+        return String.format("%+.2f", value);
+    }
+
+    /**
+     * Gets the selected colour for a typist.
+     *
+     * @param index the index of the typist
+     * @return the selected colour
+     */
+    private Color getSelectedColour(int index)
+    {
+        String colour = (String) colourBoxes[index].getSelectedItem();
+        return getColourFromName(colour);
+    }
+
+    /**
+     * Safely gets the selected colour for a typist.
+     * This prevents errors if the colour dropdown has not been created yet.
+     *
+     * @param index the index of the typist
+     * @return the selected colour, or black as a fallback
+     */
+    private Color getSelectedColourSafe(int index)
+    {
+        if (colourBoxes == null || colourBoxes[index] == null)
+        {
+            return getTypistDisplayColour(index);
+        }
+
+        return getSelectedColour(index);
+    }
+
+    /**
+     * Gets a typist display colour, falling back to the default colour list.
+     *
+     * @param index the index of the typist
+     * @return the display colour for the typist
+     */
+    private Color getTypistDisplayColour(int index)
+    {
+        if (colourBoxes != null &&
+            index >= 0 &&
+            index < colourBoxes.length &&
+            colourBoxes[index] != null)
+        {
+            return getSelectedColour(index);
+        }
+
+        if (index >= 0 && index < availableColours.length)
+        {
+            return getColourFromName(availableColours[index]);
+        }
+
+        return TEXT_LIGHT;
+    }
+
+    /**
+     * Gets the saved display colour for a typist.
+     *
+     * @param index the typist index
+     * @return the saved display colour
+     */
+    private Color getSavedTypistDisplayColour(int index)
+    {
+        if (savedColours != null && index >= 0 && index < savedColours.length)
+        {
+            return getColourFromName(savedColours[index]);
+        }
+
+        return getTypistDisplayColour(index);
+    }
+
+    /**
+     * Gets a typist display symbol, falling back to the default symbol list.
+     *
+     * @param index the index of the typist
+     * @return the display symbol for the typist
+     */
+    private String getTypistDisplaySymbol(int index)
+    {
+        if (symbolBoxes != null &&
+            index >= 0 &&
+            index < symbolBoxes.length &&
+            symbolBoxes[index] != null)
+        {
+            return getSymbolGlyph((String) symbolBoxes[index].getSelectedItem());
+        }
+
+        if (index >= 0 && index < availableSymbols.length)
+        {
+            return getSymbolGlyph(availableSymbols[index]);
+        }
+
+        return "";
+    }
+
+    /**
+     * Gets the saved display symbol for a typist.
+     *
+     * @param index the typist index
+     * @return the saved display symbol
+     */
+    private String getSavedTypistDisplaySymbol(int index)
+    {
+        if (savedSymbols != null && index >= 0 && index < savedSymbols.length)
+        {
+            return getSymbolGlyph(savedSymbols[index]);
+        }
+
+        return getTypistDisplaySymbol(index);
+    }
+
+    /**
+     * Converts a colour name into a Color object.
+     *
+     * @param colour the colour name
+     * @return the matching Color object
+     */
+    private Color getColourFromName(String colour)
+    {
+        if ("Cyan".equals(colour))
+        {
+            return new Color(103, 232, 249);
+        }
+        else if ("Green".equals(colour))
+        {
+            return new Color(134, 239, 172);
+        }
+        else if ("Pink".equals(colour))
+        {
+            return new Color(244, 114, 182);
+        }
+        else if ("Purple".equals(colour))
+        {
+            return new Color(196, 181, 253);
+        }
+        else if ("Orange".equals(colour))
+        {
+            return new Color(251, 146, 60);
+        }
+        else if ("Red".equals(colour))
+        {
+            return new Color(248, 113, 113);
+        }
+        else if ("Yellow".equals(colour))
+        {
+            return new Color(250, 204, 21);
+        }
+
+        return Color.BLACK;
+    }
+
+    /**
+     * Converts a Color object into a hex colour string for HTML text.
+     *
+     * @param color the colour to convert
+     * @return the colour as a hex string
+     */
+    private String toHex(Color color)
+    {
+        return String.format("#%02x%02x%02x",
+            color.getRed(),
+            color.getGreen(),
+            color.getBlue());
+    }
+
+    /**
+     * Gets only the display glyph from a symbol dropdown option.
+     *
+     * @param symbolOption the full symbol option text
+     * @return the symbol glyph
+     */
+    private String getSymbolGlyph(String symbolOption)
+    {
+        if (symbolOption == null || symbolOption.isEmpty())
+        {
+            return "";
+        }
+
+        int spaceIndex = symbolOption.indexOf(" ");
+        if (spaceIndex > 0)
+        {
+            return symbolOption.substring(0, spaceIndex);
+        }
+
+        return symbolOption.substring(0, 1);
+    }
+
+    /*
+     * UI construction methods.
+     */
+
+    /**
+     * Creates the main application window.
+     */
+    private void createWindow()
+    {
+        configureThemeDefaults();
+
+        frame = new JFrame("Typing Race Simulator");
+        frame.setUndecorated(true);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(1500, 850);
+        frame.setLocationRelativeTo(null);
+        frame.getContentPane().setBackground(BG_DARK);
+
+        frame.setContentPane(createWindowContent(createMainPanel()));
+        frame.setVisible(true);
     }
 
     /**
@@ -314,7 +2376,18 @@ public class TypingRaceGUI
         JTabbedPane tabbedPane = new JTabbedPane();
         tabbedPane.addTab("Race Configuration", createRaceConfigurationPanel());
         tabbedPane.addTab("Customise Typists", createCustomiseTypistsPanel());
+        tabbedPane.addTab("Shop", createShopPanel());
         tabbedPane.addTab("Statistics & Analytics", createStatsPanel());
+        tabbedPane.addChangeListener(e -> {
+            selectedMainTabIndex = tabbedPane.getSelectedIndex();
+
+            if (tabbedPane.getSelectedIndex() == 2)
+            {
+                saveCurrentOptions();
+                tabbedPane.setComponentAt(2, createShopPanel());
+            }
+        });
+        tabbedPane.setSelectedIndex(selectedMainTabIndex);
 
         mainPanel.add(titleLabel, BorderLayout.NORTH);
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
@@ -467,6 +2540,7 @@ public class TypingRaceGUI
 
         seatCountSpinner.addChangeListener(e -> {
             saveCurrentOptions();
+            validateSavedSponsors();
             updateTypistTabs();
             updateActiveRacersLabel();
         });
@@ -482,36 +2556,6 @@ public class TypingRaceGUI
         styleSpinner(seatCountSpinner);
         updateActiveRacersLabel();
         return panel;
-    }
-
-    /**
-     * Updates the list of active racers shown beside the seat count spinner.
-     */
-    private void updateActiveRacersLabel()
-    {
-        if (activeRacersLabel == null || seatCountSpinner == null)
-        {
-            return;
-        }
-
-        int count = (Integer) seatCountSpinner.getValue();
-        String text = "<html><span style=\"color:" + toHex(TEXT_MUTED) + ";\">Racers: </span>";
-
-        for (int i = 0; i < count; i++)
-        {
-            if (i > 0)
-            {
-                text += "<span style=\"color:" + toHex(TEXT_MUTED) + ";\"> &nbsp; </span>";
-            }
-
-            text += "<span style=\"font-family:'Segoe UI Symbol'; color:"
-                + toHex(getTypistDisplayColour(i)) + ";\">"
-                + getTypistDisplaySymbol(i) + "</span> "
-                + "<span style=\"color:" + toHex(getTypistDisplayColour(i)) + ";\">"
-                + typistNames[i] + "</span>";
-        }
-
-        activeRacersLabel.setText(text + "</html>");
     }
 
     /**
@@ -587,108 +2631,148 @@ public class TypingRaceGUI
     }
 
     /**
-     * Updates the impact label for selected difficulty modifiers.
+     * Creates the shop where typists can spend earned coins on upgrades.
+     *
+     * @return the shop panel
      */
-    private void updateDifficultyImpact()
+    private JPanel createShopPanel()
     {
-        String impact = "Impact: ";
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(22, 24, 22, 24));
 
-        if (autocorrectCheckBox.isSelected())
+        JLabel titleLabel = new JLabel("Upgrade Shop");
+        titleLabel.setFont(new Font("Consolas", Font.BOLD, 22));
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(titleLabel);
+        panel.add(Box.createVerticalStrut(18));
+        panel.add(createCoinGuidePanel());
+        panel.add(Box.createVerticalStrut(12));
+
+        int visibleTypists = savedSeatCount;
+
+        for (int i = 0; i < visibleTypists; i++)
         {
-            impact += "Slide back amount is reduced. ";
+            JPanel typistPanel = createTypistShopPanel(i);
+            typistPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            typistPanel.setPreferredSize(new Dimension(0, 540));
+            typistPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 540));
+            panel.add(typistPanel);
+            panel.add(Box.createVerticalStrut(14));
         }
 
-        if (caffeineModeCheckBox.isSelected())
-        {
-            impact += "Higher speed and accuracy, higher burnout risk. ";
-        }
+        stylePanel(panel);
+        styleLabel(titleLabel);
 
-        if (nightShiftCheckBox.isSelected())
-        {
-            impact += "Accuracy reduced, mistype rate increased. ";
-        }
+        JScrollPane scrollPane = new JScrollPane(panel);
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        styleBorderlessScrollPane(scrollPane);
 
-        if (!autocorrectCheckBox.isSelected() &&
-            !caffeineModeCheckBox.isSelected() &&
-            !nightShiftCheckBox.isSelected())
-        {
-            impact += "No difficulty modifiers selected.";
-        }
-
-        difficultyImpactLabel.setText(impact);
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.add(scrollPane, BorderLayout.CENTER);
+        stylePanel(wrapper);
+        return wrapper;
     }
 
     /**
-     * Shows the race screen and starts the animated race.
+     * Creates a short explanation of how coins are earned.
+     *
+     * @return coin guide panel
      */
-    private void showRaceScreen()
+    private JPanel createCoinGuidePanel()
     {
-        saveCurrentOptions();
+        JPanel panel = new JPanel(new GridLayout(3, 1, 4, 4));
+        panel.setBorder(createThemedBorder("How Coins Are Earned"));
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 112));
 
-        if (selectedPassage.trim().isEmpty())
+        JLabel baseLabel = new JLabel("Base prize by place: 1st 35, 2nd 25, 3rd 18, 4th 12, 5th 8, 6th 5 coins.");
+        JLabel bonusLabel = new JLabel("Speed bonus: +8 coins for WPM >= 25, or +15 coins for WPM >= 35.");
+        JLabel sponsorLabel = new JLabel("Sponsor bonus applies only for the selected sponsor; each burnout removes 3 coins.");
+
+        panel.add(baseLabel);
+        panel.add(bonusLabel);
+        panel.add(sponsorLabel);
+        styleSectionPanel(panel);
+        styleImpactLabel(baseLabel);
+        styleImpactLabel(bonusLabel);
+        styleImpactLabel(sponsorLabel);
+        return panel;
+    }
+
+    /**
+     * Creates one typist's shop row.
+     *
+     * @param typistIndex typist index
+     * @return shop row panel
+     */
+    private JPanel createTypistShopPanel(int typistIndex)
+    {
+        JPanel panel = new JPanel(new BorderLayout(12, 8));
+        String title = getSavedTypistDisplaySymbol(typistIndex) + " "
+            + typistNames[typistIndex] + " - " + totalCoins[typistIndex] + " coins";
+        panel.setBorder(createThemedBorder(title, getSavedTypistDisplayColour(typistIndex)));
+
+        JPanel upgradesPanel = new JPanel();
+        upgradesPanel.setLayout(new BoxLayout(upgradesPanel, BoxLayout.Y_AXIS));
+
+        JLabel keyboardsLabel = new JLabel("Keyboards");
+        keyboardsLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        keyboardsLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+        upgradesPanel.add(keyboardsLabel);
+        for (int upgradeIndex = 0; upgradeIndex < shopUpgradeNames.length; upgradeIndex++)
         {
-            JOptionPane.showMessageDialog(frame,
-                "Please select or enter a passage before starting the race.",
-                "Missing Passage",
-                JOptionPane.WARNING_MESSAGE);
-            return;
+            if (upgradeIndex == keyboardUpgrades.length)
+            {
+                JLabel accessoriesLabel = new JLabel("Accessories");
+                accessoriesLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+                accessoriesLabel.setBorder(BorderFactory.createEmptyBorder(14, 0, 6, 0));
+                upgradesPanel.add(accessoriesLabel);
+                styleLabel(accessoriesLabel);
+            }
+
+            JPanel row = createShopUpgradeRow(typistIndex, upgradeIndex);
+            row.setAlignmentX(Component.LEFT_ALIGNMENT);
+            row.setPreferredSize(new Dimension(0, 44));
+            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+            upgradesPanel.add(row);
         }
 
-        int seatCount = (Integer) seatCountSpinner.getValue();
-        speedModifiers = new double[seatCount];
-        mistypeRateModifiers = new double[seatCount];
-        burnoutChanceModifiers = new double[seatCount];
-        burnoutDurationModifiers = new int[seatCount];
-        energyDrinkPenaltyApplied = new boolean[seatCount];
+        panel.add(upgradesPanel, BorderLayout.CENTER);
+        styleSectionPanel(panel);
+        stylePanel(upgradesPanel);
+        styleLabel(keyboardsLabel);
+        return panel;
+    }
 
-        currentTypists = createTypistsFromGUI();
-        raceTextPanes = new JTextPane[currentTypists.length];
-        raceStatusLabels = new JLabel[currentTypists.length];
-        justMistyped = new boolean[currentTypists.length];
+    /**
+     * Creates a buy/status row for one upgrade.
+     *
+     * @param typistIndex typist index
+     * @param upgradeIndex upgrade index
+     * @return upgrade row
+     */
+    private JPanel createShopUpgradeRow(int typistIndex, int upgradeIndex)
+    {
+        JPanel panel = new JPanel(new BorderLayout(12, 0));
+        panel.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 14));
+        JLabel label = new JLabel(
+            shopUpgradeNames[upgradeIndex] + " (" + shopUpgradeCosts[upgradeIndex] + " coins) - "
+                + shopUpgradeDescriptions[upgradeIndex]
+        );
+        JButton buyButton = new JButton(ownedUpgrades[typistIndex][upgradeIndex] ? "Owned" : "Buy");
+        buyButton.setPreferredSize(new Dimension(104, 30));
 
-        mistypeCounts = new int[currentTypists.length];
-        burnoutCounts = new int[currentTypists.length];
-        startingAccuracies = new double[currentTypists.length];
-        raceStartTime = System.currentTimeMillis();
+        buyButton.setEnabled(!ownedUpgrades[typistIndex][upgradeIndex] &&
+            totalCoins[typistIndex] >= shopUpgradeCosts[upgradeIndex]);
+        buyButton.addActionListener(e -> buyUpgrade(typistIndex, upgradeIndex));
 
-        for (int i = 0; i < currentTypists.length; i++)
-        {
-            startingAccuracies[i] = currentTypists[i].getAccuracy();
-        }
-
-        JPanel racePanel = new JPanel(new BorderLayout(12, 25));
-        racePanel.setBorder(BorderFactory.createEmptyBorder(14, 24, 22, 34));
-
-        JLabel titleLabel = new JLabel("< Typing Race Simulator />", JLabel.CENTER);
-        titleLabel.setFont(new Font("Consolas", Font.BOLD, 30));
-        titleLabel.setForeground(PURPLE);
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
-
-        JPanel lanesPanel = new ScrollableContentPanel();
-        lanesPanel.setLayout(new BoxLayout(lanesPanel, BoxLayout.Y_AXIS));
-        lanesPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 18));
-        stylePanel(lanesPanel);
-
-        for (int i = 0; i < currentTypists.length; i++)
-        {
-            lanesPanel.add(createRaceLanePanel(currentTypists[i], i));
-            lanesPanel.add(Box.createVerticalStrut(14));
-        }
-
-        JScrollPane lanesScrollPane = new JScrollPane(lanesPanel);
-        lanesScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        styleBorderlessScrollPane(lanesScrollPane);
-
-        racePanel.add(titleLabel, BorderLayout.NORTH);
-        racePanel.add(lanesScrollPane, BorderLayout.CENTER);
-        racePanel.add(createRaceButtonPanel(), BorderLayout.SOUTH);
-
-        frame.setContentPane(createWindowContent(racePanel));
-        frame.revalidate();
-        frame.repaint();
-        stylePanel(racePanel);
-
-        startRaceAnimation();
+        panel.add(label, BorderLayout.CENTER);
+        panel.add(buyButton, BorderLayout.EAST);
+        stylePanel(panel);
+        styleImpactLabel(label);
+        styleButton(buyButton);
+        return panel;
     }
 
     /**
@@ -791,182 +2875,6 @@ public class TypingRaceGUI
     }
 
     /**
-     * Starts the GUI race animation using a Swing timer.
-     */
-    private void startRaceAnimation()
-    {
-        raceTimer = new Timer(450, e -> runRaceTurn());
-        raceTimer.start();
-    }
-
-    /**
-     * Runs one turn of the race animation.
-     * Uses Typist methods for progress, slide-back and burnout state.
-     */
-    private void runRaceTurn()
-    {
-        for (int i = 0; i < currentTypists.length; i++)
-        {
-            Typist typist = currentTypists[i];
-            justMistyped[i] = false;
-            applyMidRaceEnergyDrinkPenalty(i);
-
-            if (typist.isBurntOut())
-            {
-                typist.recoverFromBurnout();
-                updateRaceText(i);
-                updateRaceStatus(i);
-                continue;
-            }
-
-            typeCharactersForTurn(typist, speedModifiers[i]);
-
-            double mistypeChance = (1.0 - typist.getAccuracy())
-                * MISTYPE_BASE_CHANCE
-                * mistypeRateModifiers[i];
-
-            if (noiseCancellingBoxes[i].isSelected())
-            {
-                mistypeChance = mistypeChance * 0.75;
-            }
-
-            if (mistypeChance < 0.0)
-            {
-                mistypeChance = 0.0;
-            }
-
-            if (Math.random() < mistypeChance)
-            {
-                int slideBackAmount = SLIDE_BACK_AMOUNT;
-
-                if (autocorrectCheckBox.isSelected())
-                {
-                    slideBackAmount = 1;
-                }
-
-                typist.slideBack(slideBackAmount);
-                justMistyped[i] = true;
-                mistypeCounts[i]++;
-            }
-
-            double burnoutChance = 0.04 * burnoutChanceModifiers[i];
-
-            if (caffeineModeCheckBox.isSelected())
-            {
-                burnoutChance = burnoutChance * 1.35;
-            }
-
-            if (Math.random() < burnoutChance)
-            {
-                int burnoutDuration = BURNOUT_DURATION + burnoutDurationModifiers[i];
-
-                if (wristSupportBoxes[i].isSelected())
-                {
-                    burnoutDuration = burnoutDuration - 1;
-                }
-
-                if (burnoutDuration < 1)
-                {
-                    burnoutDuration = 1;
-                }
-
-                typist.burnOut(burnoutDuration);
-                burnoutCounts[i]++;
-                typist.setAccuracy(typist.getAccuracy() - 0.01);
-            }
-
-            updateRaceText(i);
-            updateRaceStatus(i);
-
-            if (typist.getProgress() >= selectedPassage.length())
-            {
-                finishRace(typist);
-                return;
-            }
-        }
-    }
-
-    /**
-     * Gives a typist one or more typing attempts based on their speed profile.
-     *
-     * @param typist the typist taking this turn
-     * @param speedModifier the typing speed multiplier for this typist
-     */
-    private void typeCharactersForTurn(Typist typist, double speedModifier)
-    {
-        int attempts = 0;
-        double remainingSpeed = speedModifier;
-
-        while (remainingSpeed >= 1.0)
-        {
-            attempts++;
-            remainingSpeed = remainingSpeed - 1.0;
-        }
-
-        if (Math.random() < remainingSpeed)
-        {
-            attempts++;
-        }
-
-        for (int attempt = 0; attempt < attempts; attempt++)
-        {
-            if (Math.random() < typist.getAccuracy())
-            {
-                typist.typeCharacter();
-            }
-        }
-    }
-
-    /**
-     * Applies the late-race drawback for the Energy Drink accessory once.
-     *
-     * @param index the index of the typist
-     */
-    private void applyMidRaceEnergyDrinkPenalty(int index)
-    {
-        if (!energyDrinkBoxes[index].isSelected() ||
-            energyDrinkPenaltyApplied[index] ||
-            selectedPassage.length() == 0)
-        {
-            return;
-        }
-
-        if (currentTypists[index].getProgress() >= selectedPassage.length() / 2)
-        {
-            currentTypists[index].setAccuracy(currentTypists[index].getAccuracy() - 0.10);
-            speedModifiers[index] = speedModifiers[index] * 0.90;
-            energyDrinkPenaltyApplied[index] = true;
-        }
-    }
-
-    /**
-     * Finishes the race, stores final statistics, and enables the stats button.
-     *
-     * @param winner the winning typist
-     */
-    private void finishRace(Typist winner)
-    {
-        raceTimer.stop();
-
-        double oldAccuracy = winner.getAccuracy();
-        winner.setAccuracy(oldAccuracy + 0.02);
-
-        recordRaceStatistics();
-
-        if (viewStatsButton != null)
-        {
-            viewStatsButton.setEnabled(true);
-        }
-
-        if (raceWinnerLabel != null)
-        {
-            raceWinnerLabel.setText("<html>Winner: " + winner.getName()
-                + "<br>Accuracy: " + String.format("%.2f", oldAccuracy)
-                + " -> " + String.format("%.2f", winner.getAccuracy()) + "</html>");
-        }
-    }
-
-    /**
      * Updates the visible passage text for one typist.
      * Typed text is highlighted using the typist's selected colour.
      * The current character is highlighted in yellow.
@@ -1014,7 +2922,7 @@ public class TypingRaceGUI
             pane.setText(selectedPassage);
         }
     }
-    
+
     /**
      * Updates the status label for one typist.
      *
@@ -1036,7 +2944,7 @@ public class TypingRaceGUI
         {
             raceStatusLabels[index].setText("Progress: " + typist.getProgress()
                 + " / " + selectedPassage.length()
-                + " | Accuracy: " + String.format("%.2f", typist.getAccuracy()));
+                + " | Accuracy Rating: " + String.format("%.2f", typist.getAccuracy()));
         }
     }
 
@@ -1077,183 +2985,6 @@ public class TypingRaceGUI
     }
 
     /**
-     * Records calculated statistics for the completed race.
-     *
-     */
-    private void recordRaceStatistics()
-    {
-        raceNumber++;
-
-        double elapsedMinutes = (System.currentTimeMillis() - raceStartTime) / 60000.0;
-        lastRacePerformances = new RacePerformance[currentTypists.length];
-        int[] positions = calculateRacePositions();
-        updateConsecutiveWins(positions);
-
-        for (int i = 0; i < currentTypists.length; i++)
-        {
-            double wordsTyped = currentTypists[i].getProgress() / 5.0;
-            double wpm = 0.0;
-
-            if (elapsedMinutes > 0)
-            {
-                wpm = wordsTyped / elapsedMinutes;
-            }
-
-            int totalAttempts = currentTypists[i].getProgress() + mistypeCounts[i];
-            double accuracyPercent = 100.0;
-
-            if (totalAttempts > 0)
-            {
-                accuracyPercent = ((double) currentTypists[i].getProgress() / totalAttempts) * 100.0;
-            }
-
-            int rewardPoints = calculateRewardPoints(positions[i], wpm, burnoutCounts[i]);
-            leaderboardPoints[i] += rewardPoints;
-
-            RacePerformance performance = new RacePerformance(
-                raceNumber,
-                currentTypists[i].getName(),
-                positions[i],
-                wpm,
-                accuracyPercent,
-                mistypeCounts[i],
-                burnoutCounts[i],
-                rewardPoints,
-                startingAccuracies[i],
-                currentTypists[i].getAccuracy()
-            );
-
-            lastRacePerformances[i] = performance;
-            typistRaceHistories[i].add(performance);
-
-            if (wpm > bestWpmRecords[i])
-            {
-                bestWpmRecords[i] = wpm;
-            }
-        }
-
-    }
-
-    /**
-     * Calculates finishing positions from progress through the final race state.
-     *
-     * @return position for each typist index
-     */
-    private int[] calculateRacePositions()
-    {
-        int[] positions = new int[currentTypists.length];
-        boolean[] assigned = new boolean[currentTypists.length];
-
-        for (int position = 1; position <= currentTypists.length; position++)
-        {
-            int bestIndex = -1;
-
-            for (int i = 0; i < currentTypists.length; i++)
-            {
-                if (!assigned[i] && (bestIndex == -1 || typistFinishedAheadOf(i, bestIndex)))
-                {
-                    bestIndex = i;
-                }
-            }
-
-            assigned[bestIndex] = true;
-            positions[bestIndex] = position;
-        }
-
-        return positions;
-    }
-
-    /**
-     * Compares two typists when assigning race positions.
-     *
-     * @param firstIndex the first typist index
-     * @param secondIndex the second typist index
-     * @return true if the first typist should be placed ahead
-     */
-    private boolean typistFinishedAheadOf(int firstIndex, int secondIndex)
-    {
-        if (currentTypists[firstIndex].getProgress() != currentTypists[secondIndex].getProgress())
-        {
-            return currentTypists[firstIndex].getProgress() > currentTypists[secondIndex].getProgress();
-        }
-
-        if (mistypeCounts[firstIndex] != mistypeCounts[secondIndex])
-        {
-            return mistypeCounts[firstIndex] < mistypeCounts[secondIndex];
-        }
-
-        if (burnoutCounts[firstIndex] != burnoutCounts[secondIndex])
-        {
-            return burnoutCounts[firstIndex] < burnoutCounts[secondIndex];
-        }
-
-        if (currentTypists[firstIndex].getAccuracy() != currentTypists[secondIndex].getAccuracy())
-        {
-            return currentTypists[firstIndex].getAccuracy() > currentTypists[secondIndex].getAccuracy();
-        }
-
-        return firstIndex < secondIndex;
-    }
-
-    /**
-     * Updates consecutive win counts after a race.
-     *
-     * @param positions finishing positions
-     */
-    private void updateConsecutiveWins(int[] positions)
-    {
-        for (int i = 0; i < positions.length; i++)
-        {
-            if (positions[i] == 1)
-            {
-                consecutiveWinCounts[i]++;
-            }
-            else
-            {
-                consecutiveWinCounts[i] = 0;
-            }
-        }
-    }
-
-    /**
-     * Calculates leaderboard reward points for one typist in one race.
-     *
-     * @param position finishing position
-     * @param wpm words per minute
-     * @param burnouts burnout count
-     * @return reward points earned
-     */
-    private int calculateRewardPoints(int position, double wpm, int burnouts)
-    {
-        int points = 0;
-
-        if (position == 1)
-        {
-            points = 3;
-        }
-        else if (position == 2)
-        {
-            points = 2;
-        }
-        else if (position == 3)
-        {
-            points = 1;
-        }
-
-        if (wpm >= 25.0)
-        {
-            points++;
-        }
-
-        if (burnouts == 0)
-        {
-            points++;
-        }
-
-        return points;
-    }
-
-    /**
      * Creates the statistics tab.
      * This contains separate tabs for leaderboard, summary, history, comparison, and charts.
      *
@@ -1289,11 +3020,12 @@ public class TypingRaceGUI
             "Position",
             "Typist",
             "WPM",
-            "Accuracy %",
+            "Race Accuracy %",
             "Mistypes",
             "Burnouts",
             "Points Earned",
-            "Accuracy Change"
+            "Coins Earned",
+            "Accuracy Rating \u0394"
         };
 
         if (lastRacePerformances == null || lastRacePerformances.length == 0)
@@ -1323,7 +3055,7 @@ public class TypingRaceGUI
         JPanel panel = new JPanel(new GridLayout(3, 1, 4, 4));
         panel.setBorder(createThemedBorder("How to Earn Titles and Badges"));
 
-        JLabel pointsLabel = new JLabel("Points: 1st = 3, 2nd = 2, 3rd = 1, +1 for WPM >= 25, +1 for zero burnouts.");
+        JLabel pointsLabel = new JLabel("Coins: smaller position prize + speed bonus, sponsor bonus, minus 3 coins per burnout.");
         JLabel titlesLabel = new JLabel("Titles: Rookie under 5 points, Rising Racer at 5, Podium Regular at 10, Track Champion at 20.");
         JLabel badgesLabel = new JLabel("Badges: Speed Demon = 3 consecutive wins, Rapid Keys = best WPM >= 30, Iron Fingers = 5 burnout-free races.");
 
@@ -1337,36 +3069,6 @@ public class TypingRaceGUI
         styleImpactLabel(badgesLabel);
 
         return panel;
-    }
-
-    /**
-     * Gets last race performances ordered by finishing position.
-     *
-     * @return ordered race performance data
-     */
-    private RacePerformance[] getLastRacePerformancesByPosition()
-    {
-        RacePerformance[] orderedPerformances = new RacePerformance[lastRacePerformances.length];
-
-        for (int i = 0; i < lastRacePerformances.length; i++)
-        {
-            orderedPerformances[i] = lastRacePerformances[i];
-        }
-
-        for (int i = 0; i < orderedPerformances.length - 1; i++)
-        {
-            for (int j = i + 1; j < orderedPerformances.length; j++)
-            {
-                if (orderedPerformances[j].position < orderedPerformances[i].position)
-                {
-                    RacePerformance temp = orderedPerformances[i];
-                    orderedPerformances[i] = orderedPerformances[j];
-                    orderedPerformances[j] = temp;
-                }
-            }
-        }
-
-        return orderedPerformances;
     }
 
     /**
@@ -1385,7 +3087,9 @@ public class TypingRaceGUI
             "Rank",
             "Typist",
             "Points",
+            "Coins",
             "Best WPM",
+            "Accuracy Rating",
             "Races",
             "Current Title",
             "Badges"
@@ -1401,10 +3105,12 @@ public class TypingRaceGUI
                 rows[row][0] = row + 1;
                 rows[row][1] = typistNames[index];
                 rows[row][2] = leaderboardPoints[index];
-                rows[row][3] = formatDouble(bestWpmRecords[index]);
-                rows[row][4] = typistRaceHistories[index].size();
-                rows[row][5] = getLeaderboardTitle(index);
-                rows[row][6] = getLeaderboardBadges(index);
+                rows[row][3] = totalCoins[index];
+                rows[row][4] = formatDouble(bestWpmRecords[index]);
+                rows[row][5] = formatDouble(getLatestSkillAccuracy(index));
+                rows[row][6] = typistRaceHistories[index].size();
+                rows[row][7] = getLeaderboardTitle(index);
+                rows[row][8] = getLeaderboardBadges(index);
                 row++;
             }
         }
@@ -1430,142 +3136,6 @@ public class TypingRaceGUI
     }
 
     /**
-     * Gets typist indexes ordered by cumulative leaderboard score.
-     *
-     * @return ordered typist indexes
-     */
-    private int[] getLeaderboardOrder()
-    {
-        int[] orderedIndexes = new int[typistNames.length];
-
-        for (int i = 0; i < orderedIndexes.length; i++)
-        {
-            orderedIndexes[i] = i;
-        }
-
-        for (int i = 0; i < orderedIndexes.length - 1; i++)
-        {
-            for (int j = i + 1; j < orderedIndexes.length; j++)
-            {
-                if (leaderboardRankedAheadOf(orderedIndexes[j], orderedIndexes[i]))
-                {
-                    int temp = orderedIndexes[i];
-                    orderedIndexes[i] = orderedIndexes[j];
-                    orderedIndexes[j] = temp;
-                }
-            }
-        }
-
-        return orderedIndexes;
-    }
-
-    /**
-     * Compares typists for leaderboard ranking.
-     *
-     * @param firstIndex first typist index
-     * @param secondIndex second typist index
-     * @return true if the first typist ranks ahead
-     */
-    private boolean leaderboardRankedAheadOf(int firstIndex, int secondIndex)
-    {
-        if (leaderboardPoints[firstIndex] != leaderboardPoints[secondIndex])
-        {
-            return leaderboardPoints[firstIndex] > leaderboardPoints[secondIndex];
-        }
-
-        if (bestWpmRecords[firstIndex] != bestWpmRecords[secondIndex])
-        {
-            return bestWpmRecords[firstIndex] > bestWpmRecords[secondIndex];
-        }
-
-        return firstIndex < secondIndex;
-    }
-
-    /**
-     * Gets a leaderboard title from cumulative point milestones.
-     *
-     * @param index typist index
-     * @return current title
-     */
-    private String getLeaderboardTitle(int index)
-    {
-        if (leaderboardPoints[index] >= 20)
-        {
-            return "Track Champion";
-        }
-        else if (leaderboardPoints[index] >= 10)
-        {
-            return "Podium Regular";
-        }
-        else if (leaderboardPoints[index] >= 5)
-        {
-            return "Rising Racer";
-        }
-
-        return "Rookie";
-    }
-
-    /**
-     * Gets all badges earned from race milestones.
-     *
-     * @param index typist index
-     * @return milestone badges
-     */
-    private String getLeaderboardBadges(int index)
-    {
-        ArrayList<String> badges = new ArrayList<>();
-
-        if (consecutiveWinCounts[index] >= 3)
-        {
-            badges.add("Speed Demon");
-        }
-
-        if (bestWpmRecords[index] >= 30.0)
-        {
-            badges.add("Rapid Keys");
-        }
-
-        if (typistHasBurnoutFreeStreak(index, 5))
-        {
-            badges.add("Iron Fingers");
-        }
-
-        if (badges.isEmpty())
-        {
-            return "-";
-        }
-
-        return String.join(", ", badges);
-    }
-
-    /**
-     * Checks whether a typist has a burnout-free streak.
-     *
-     * @param index typist index
-     * @param streakLength required streak length
-     * @return true if the streak exists
-     */
-    private boolean typistHasBurnoutFreeStreak(int index, int streakLength)
-    {
-        ArrayList<RacePerformance> history = typistRaceHistories[index];
-
-        if (history.size() < streakLength)
-        {
-            return false;
-        }
-
-        for (int i = history.size() - streakLength; i < history.size(); i++)
-        {
-            if (history.get(i).burnouts > 0)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
      * Creates the full race history table.
      *
      * @return the race history panel
@@ -1577,11 +3147,12 @@ public class TypingRaceGUI
             "Position",
             "Typist",
             "WPM",
-            "Accuracy %",
+            "Race Accuracy %",
             "Mistypes",
             "Burnouts",
             "Reward Points",
-            "Accuracy Change"
+            "Coins",
+            "Accuracy Rating \u0394"
         };
         int rowCount = countRaceHistoryRows();
 
@@ -1605,7 +3176,8 @@ public class TypingRaceGUI
                 rows[row][5] = performance.mistypes;
                 rows[row][6] = performance.burnouts;
                 rows[row][7] = performance.rewardPoints;
-                rows[row][8] = formatSignedDouble(performance.accuracyChange);
+                rows[row][8] = performance.coinsEarned;
+                rows[row][9] = formatSignedDouble(performance.accuracyChange);
                 row++;
             }
         }
@@ -1643,7 +3215,7 @@ public class TypingRaceGUI
             typistSelectionPanel.add(typistSelectionBoxes[i]);
         }
 
-        String[] metrics = {"WPM", "Accuracy %", "Burnouts", "Mistypes"};
+        String[] metrics = {"WPM", "Race Accuracy %", "Accuracy Rating", "Burnouts", "Mistypes"};
         JComboBox<String> metricBox = new JComboBox<>(metrics);
 
         JButton compareButton = new JButton("Compare");
@@ -1743,7 +3315,7 @@ public class TypingRaceGUI
             typistSelectionPanel.add(typistSelectionBoxes[i]);
         }
 
-        String[] metrics = {"WPM", "Accuracy %", "Burnouts", "Mistypes"};
+        String[] metrics = {"WPM", "Race Accuracy %", "Accuracy Rating", "Burnouts", "Mistypes"};
         JComboBox<String> metricBox = new JComboBox<>(metrics);
         PerformanceChartPanel chartPanel = new PerformanceChartPanel(
             recordedTypistIndexes,
@@ -1834,381 +3406,6 @@ public class TypingRaceGUI
     }
 
     /**
-     * Finds one typist's performance for a specific race.
-     *
-     * @param typistIndex the typist index
-     * @param targetRaceNumber the race number to find
-     * @return the matching performance, or null if no data exists
-     */
-    private RacePerformance findPerformanceForRace(int typistIndex, int targetRaceNumber)
-    {
-        for (RacePerformance performance : typistRaceHistories[typistIndex])
-        {
-            if (performance.raceNumber == targetRaceNumber)
-            {
-                return performance;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Gets formatted metric data for one race performance.
-     *
-     * @param performance the performance record
-     * @param metric the selected metric
-     * @return formatted metric value
-     */
-    private Object getMetricValue(RacePerformance performance, String metric)
-    {
-        if ("Accuracy %".equals(metric))
-        {
-            return formatDouble(performance.accuracyPercent) + "%";
-        }
-        else if ("Burnouts".equals(metric))
-        {
-            return performance.burnouts;
-        }
-        else if ("Mistypes".equals(metric))
-        {
-            return performance.mistypes;
-        }
-        else if ("Position".equals(metric))
-        {
-            return performance.position;
-        }
-        else if ("Accuracy Change".equals(metric))
-        {
-            return formatSignedDouble(performance.accuracyChange);
-        }
-
-        return formatDouble(performance.wpm);
-    }
-
-    /**
-     * Gets numeric metric data for charts.
-     *
-     * @param performance the performance record
-     * @param metric the selected metric
-     * @return numeric metric value
-     */
-    private double getChartMetricValue(RacePerformance performance, String metric)
-    {
-        if ("Accuracy %".equals(metric))
-        {
-            return performance.accuracyPercent;
-        }
-        else if ("Burnouts".equals(metric))
-        {
-            return performance.burnouts;
-        }
-        else if ("Mistypes".equals(metric))
-        {
-            return performance.mistypes;
-        }
-        else if ("Position".equals(metric))
-        {
-            return performance.position;
-        }
-        else if ("Accuracy Change".equals(metric))
-        {
-            return performance.accuracyChange;
-        }
-
-        return performance.wpm;
-    }
-
-    /**
-     * Counts selected check boxes.
-     *
-     * @param boxes the check boxes to count
-     * @return the selected count
-     */
-    private int countSelectedBoxes(JCheckBox[] boxes)
-    {
-        int count = 0;
-
-        for (JCheckBox box : boxes)
-        {
-            if (box.isSelected())
-            {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    /**
-     * Counts typists who have at least one race result.
-     *
-     * @return the number of typists with recorded race data
-     */
-    private int countTypistsWithRaceData()
-    {
-        int count = 0;
-
-        for (ArrayList<RacePerformance> history : typistRaceHistories)
-        {
-            if (!history.isEmpty())
-            {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    /**
-     * Counts all race history rows.
-     *
-     * @return the total number of stored performance rows
-     */
-    private int countRaceHistoryRows()
-    {
-        int count = 0;
-
-        for (ArrayList<RacePerformance> history : typistRaceHistories)
-        {
-            count += history.size();
-        }
-
-        return count;
-    }
-
-    /**
-     * Gets indexes for typists with recorded race data.
-     *
-     * @return typist indexes with race history
-     */
-    private int[] getTypistsWithRaceData()
-    {
-        int[] indexes = new int[countTypistsWithRaceData()];
-        int row = 0;
-
-        for (int i = 0; i < typistRaceHistories.length; i++)
-        {
-            if (!typistRaceHistories[i].isEmpty())
-            {
-                indexes[row] = i;
-                row++;
-            }
-        }
-
-        return indexes;
-    }
-
-    /**
-     * Builds a row for a full performance table.
-     *
-     * @param performance the performance record
-     * @return table row data
-     */
-    private Object[] createPerformanceRow(RacePerformance performance)
-    {
-        return new Object[] {
-            performance.position,
-            performance.typistName,
-            formatDouble(performance.wpm),
-            formatDouble(performance.accuracyPercent) + "%",
-            performance.mistypes,
-            performance.burnouts,
-            performance.rewardPoints,
-            formatSignedDouble(performance.accuracyChange)
-        };
-    }
-
-    /**
-     * Replaces the content inside a holder panel.
-     *
-     * @param holder the panel receiving new content
-     * @param content the new content panel
-     */
-    private void replacePanelContent(JPanel holder, JPanel content)
-    {
-        holder.removeAll();
-        holder.add(content, BorderLayout.CENTER);
-        holder.revalidate();
-        holder.repaint();
-    }
-
-    /**
-     * Formats a double to two decimal places.
-     *
-     * @param value the value to format
-     * @return formatted value
-     */
-    private String formatDouble(double value)
-    {
-        return String.format("%.2f", value);
-    }
-
-    /**
-     * Formats a signed double to two decimal places.
-     *
-     * @param value the value to format
-     * @return formatted signed value
-     */
-    private String formatSignedDouble(double value)
-    {
-        return String.format("%+.2f", value);
-    }
-
-    /**
-     * Gets the selected colour for a typist.
-     *
-     * @param index the index of the typist
-     * @return the selected colour
-     */
-    private Color getSelectedColour(int index)
-    {
-        String colour = (String) colourBoxes[index].getSelectedItem();
-        return getColourFromName(colour);
-    }
-
-    /**
-     * Safely gets the selected colour for a typist.
-     * This prevents errors if the colour dropdown has not been created yet.
-     *
-     * @param index the index of the typist
-     * @return the selected colour, or black as a fallback
-     */
-    private Color getSelectedColourSafe(int index)
-    {
-        if (colourBoxes == null || colourBoxes[index] == null)
-        {
-            return getTypistDisplayColour(index);
-        }
-
-        return getSelectedColour(index);
-    }
-
-    /**
-     * Gets a typist display colour, falling back to the default colour list.
-     *
-     * @param index the index of the typist
-     * @return the display colour for the typist
-     */
-    private Color getTypistDisplayColour(int index)
-    {
-        if (colourBoxes != null &&
-            index >= 0 &&
-            index < colourBoxes.length &&
-            colourBoxes[index] != null)
-        {
-            return getSelectedColour(index);
-        }
-
-        if (index >= 0 && index < availableColours.length)
-        {
-            return getColourFromName(availableColours[index]);
-        }
-
-        return TEXT_LIGHT;
-    }
-
-    /**
-     * Gets a typist display symbol, falling back to the default symbol list.
-     *
-     * @param index the index of the typist
-     * @return the display symbol for the typist
-     */
-    private String getTypistDisplaySymbol(int index)
-    {
-        if (symbolBoxes != null &&
-            index >= 0 &&
-            index < symbolBoxes.length &&
-            symbolBoxes[index] != null)
-        {
-            return getSymbolGlyph((String) symbolBoxes[index].getSelectedItem());
-        }
-
-        if (index >= 0 && index < availableSymbols.length)
-        {
-            return getSymbolGlyph(availableSymbols[index]);
-        }
-
-        return "";
-    }
-
-    /**
-     * Converts a colour name into a Color object.
-     *
-     * @param colour the colour name
-     * @return the matching Color object
-     */
-    private Color getColourFromName(String colour)
-    {
-        if ("Cyan".equals(colour))
-        {
-            return new Color(103, 232, 249);
-        }
-        else if ("Green".equals(colour))
-        {
-            return new Color(134, 239, 172);
-        }
-        else if ("Pink".equals(colour))
-        {
-            return new Color(244, 114, 182);
-        }
-        else if ("Purple".equals(colour))
-        {
-            return new Color(196, 181, 253);
-        }
-        else if ("Orange".equals(colour))
-        {
-            return new Color(251, 146, 60);
-        }
-        else if ("Red".equals(colour))
-        {
-            return new Color(248, 113, 113);
-        }
-        else if ("Yellow".equals(colour))
-        {
-            return new Color(250, 204, 21);
-        }
-
-        return Color.BLACK;
-    }
-
-    /**
-     * Converts a Color object into a hex colour string for HTML text.
-     *
-     * @param color the colour to convert
-     * @return the colour as a hex string
-     */
-    private String toHex(Color color)
-    {
-        return String.format("#%02x%02x%02x",
-            color.getRed(),
-            color.getGreen(),
-            color.getBlue());
-    }
-
-    /**
-     * Gets only the display glyph from a symbol dropdown option.
-     *
-     * @param symbolOption the full symbol option text
-     * @return the symbol glyph
-     */
-    private String getSymbolGlyph(String symbolOption)
-    {
-        if (symbolOption == null || symbolOption.isEmpty())
-        {
-            return "";
-        }
-
-        int spaceIndex = symbolOption.indexOf(" ");
-        if (spaceIndex > 0)
-        {
-            return symbolOption.substring(0, spaceIndex);
-        }
-
-        return symbolOption.substring(0, 1);
-    }
-
-    /**
      * Creates the customisation panel for typist options.
      * Each typist has their own tab.
      *
@@ -2227,55 +3424,6 @@ public class TypingRaceGUI
         styleTabbedPane(typistTabbedPane);
 
         return panel;
-    }
-
-    /**
-     * Updates the typist tabs based on the selected number of racers.
-     */
-    @SuppressWarnings("unchecked")
-    private void updateTypistTabs()
-    {
-        if (typistTabbedPane == null || seatCountSpinner == null)
-        {
-            return;
-        }
-
-        saveCurrentOptions();
-        int count = (Integer) seatCountSpinner.getValue();
-
-        typingStyleBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
-        keyboardTypeBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
-        symbolBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
-        colourBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
-        wristSupportBoxes = new JCheckBox[count];
-        energyDrinkBoxes = new JCheckBox[count];
-        noiseCancellingBoxes = new JCheckBox[count];
-        impactLabels = new JLabel[count];
-        typingStyleImpactLabels = new JLabel[count];
-        keyboardTypeImpactLabels = new JLabel[count];
-
-        typistTabbedPane.removeAll();
-
-        for (int i = 0; i < count; i++)
-        {
-            String hex = toHex(getSelectedColourSafe(i));
-            String symbolGlyph = getSymbolGlyph(availableSymbols[i]);
-
-            typistTabbedPane.addTab(
-                typistNames[i],
-                createTypistScrollPane(i)
-            );
-            typistTabbedPane.setTabComponentAt(i,
-                createTypistTabLabel(symbolGlyph, typistNames[i], hex)
-            );
-        }
-
-        updateSymbolAvailability();
-        updateColourAvailability();
-        updateActiveRacersLabel();
-
-        typistTabbedPane.revalidate();
-        typistTabbedPane.repaint();
     }
 
     /**
@@ -2306,16 +3454,20 @@ public class TypingRaceGUI
         panel.setBorder(BorderFactory.createEmptyBorder(22, 22, 22, 22));
 
         JPanel typingStylePanel = createTypingStylePanel(index);
+        JPanel sponsorPanel = createSponsorPanel(index);
         JPanel keyboardTypePanel = createKeyboardTypePanel(index);
         JPanel symbolColourPanel = createSymbolColourPanel(index);
         JPanel accessoriesPanel = createAccessoriesPanel(index);
 
         typingStylePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 126));
+        sponsorPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 126));
         keyboardTypePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 126));
         symbolColourPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 138));
-        accessoriesPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 178));
+        accessoriesPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 230));
 
         panel.add(typingStylePanel);
+        panel.add(Box.createVerticalStrut(18));
+        panel.add(sponsorPanel);
         panel.add(Box.createVerticalStrut(18));
         panel.add(keyboardTypePanel);
         panel.add(Box.createVerticalStrut(18));
@@ -2369,6 +3521,35 @@ public class TypingRaceGUI
     }
 
     /**
+     * Creates the sponsor deal section for one typist.
+     *
+     * @param index the index of the typist
+     * @return the sponsor panel
+     */
+    private JPanel createSponsorPanel(int index)
+    {
+        JPanel panel = new JPanel(new GridLayout(3, 1, 8, 8));
+        panel.setBorder(createThemedBorder("Sponsor Deal"));
+
+        validateSavedSponsors();
+        sponsorBoxes[index] = new JComboBox<>(getAvailableSponsorOptions());
+        sponsorBoxes[index].setSelectedItem(savedSponsors[index]);
+        sponsorBoxes[index].addActionListener(e -> saveCurrentOptions());
+
+        JLabel chooseLabel = new JLabel("Choose sponsor:");
+        JLabel impactLabel = new JLabel("Sponsors pay bonus coins after races.");
+
+        panel.add(chooseLabel);
+        panel.add(sponsorBoxes[index]);
+        panel.add(impactLabel);
+        styleSectionPanel(panel);
+        styleLabel(chooseLabel);
+        styleImpactLabel(impactLabel);
+        styleComboBox(sponsorBoxes[index]);
+        return panel;
+    }
+
+    /**
      * Creates the keyboard type customisation section for one typist.
      *
      * @param index the index of the typist
@@ -2379,15 +3560,15 @@ public class TypingRaceGUI
         JPanel panel = new JPanel(new GridLayout(3, 1, 8, 8));
         panel.setBorder(createThemedBorder("Keyboard Type"));
 
-        String[] keyboardTypes = {
-            "Mechanical",
-            "Membrane",
-            "Touchscreen",
-            "Stenography"
-        };
+        String[] keyboardTypes = getAvailableKeyboardTypes(index);
 
         keyboardTypeBoxes[index] = new JComboBox<>(keyboardTypes);
         keyboardTypeBoxes[index].setSelectedItem(savedKeyboardTypes[index]);
+        if (keyboardTypeBoxes[index].getSelectedItem() == null)
+        {
+            savedKeyboardTypes[index] = "Membrane";
+            keyboardTypeBoxes[index].setSelectedItem(savedKeyboardTypes[index]);
+        }
         JLabel chooseLabel = new JLabel("Choose keyboard type:");
         keyboardTypeImpactLabels[index] = new JLabel();
         updateKeyboardTypeImpact(index);
@@ -2406,96 +3587,6 @@ public class TypingRaceGUI
         styleComboBox(keyboardTypeBoxes[index]);
 
         return panel;
-    }
-
-    /**
-     * Updates the visible typing style impact text.
-     *
-     * @param index the index of the typist
-     */
-    private void updateTypingStyleImpact(int index)
-    {
-        if (typingStyleImpactLabels == null || typingStyleImpactLabels[index] == null)
-        {
-            return;
-        }
-
-        typingStyleImpactLabels[index].setText(
-            "Impact: " + getTypingStyleImpact((String) typingStyleBoxes[index].getSelectedItem())
-        );
-    }
-
-    /**
-     * Updates the visible keyboard type impact text.
-     *
-     * @param index the index of the typist
-     */
-    private void updateKeyboardTypeImpact(int index)
-    {
-        if (keyboardTypeImpactLabels == null || keyboardTypeImpactLabels[index] == null)
-        {
-            return;
-        }
-
-        keyboardTypeImpactLabels[index].setText(
-            "Impact: " + getKeyboardTypeImpact((String) keyboardTypeBoxes[index].getSelectedItem())
-        );
-    }
-
-    /**
-     * Gets the impact text for a typing style.
-     *
-     * @param typingStyle the selected typing style
-     * @return the impact description
-     */
-    private String getTypingStyleImpact(String typingStyle)
-    {
-        if ("Touch Typist".equals(typingStyle))
-        {
-            return "Higher accuracy, slightly lower burnout risk.";
-        }
-        else if ("Hunt & Peck".equals(typingStyle))
-        {
-            return "Lower accuracy, lower burnout risk.";
-        }
-        else if ("Phone Thumbs".equals(typingStyle))
-        {
-            return "Lower accuracy, higher and longer burnout risk.";
-        }
-        else if ("Voice-to-Text".equals(typingStyle))
-        {
-            return "Higher accuracy, slightly higher burnout risk.";
-        }
-
-        return "Balanced accuracy and burnout profile.";
-    }
-
-    /**
-     * Gets the impact text for a keyboard type.
-     *
-     * @param keyboardType the selected keyboard type
-     * @return the impact description
-     */
-    private String getKeyboardTypeImpact(String keyboardType)
-    {
-        if ("Mechanical".equals(keyboardType))
-        {
-            return "Faster typing speed, lower mistype rate.";
-        }
-        else if ("Membrane".equals(keyboardType))
-        {
-            return "Slightly slower speed, steady mistype rate.";
-        }
-        else if ("Touchscreen".equals(keyboardType))
-        {
-            return "Slower speed, higher mistype rate.";
-        }
-        else if ("Stenography".equals(keyboardType))
-        {
-            return "Much faster speed, higher mistype rate.";
-        }
-
-        return "Steady typing speed and mistype rate.";
     }
 
     /**
@@ -2565,283 +3656,6 @@ public class TypingRaceGUI
     }
 
     /**
-     * Updates all colour dropdowns so a colour already used by one typist
-     * cannot be selected by another typist.
-     */
-    private void updateColourAvailability()
-    {
-        if (updatingSymbols || colourBoxes == null)
-        {
-            return;
-        }
-
-        updatingSymbols = true;
-
-        int count = (Integer) seatCountSpinner.getValue();
-        String[] selectedColours = new String[count];
-
-        for (int i = 0; i < count; i++)
-        {
-            if (colourBoxes[i] != null)
-            {
-                selectedColours[i] = (String) colourBoxes[i].getSelectedItem();
-            }
-        }
-
-        removeDuplicateSelections(selectedColours, availableColours);
-
-        for (int i = 0; i < count; i++)
-        {
-            if (colourBoxes[i] != null)
-            {
-                String currentColour = selectedColours[i];
-
-                colourBoxes[i].removeAllItems();
-
-                for (String colour : availableColours)
-                {
-                    if (colour.equals(currentColour) || !colourIsUsedByAnotherTypist(colour, selectedColours, i))
-                    {
-                        colourBoxes[i].addItem(colour);
-                    }
-                }
-
-                colourBoxes[i].setSelectedItem(currentColour);
-                colourBoxes[i].setRenderer(new ColourComboBoxRenderer());
-                colourBoxes[i].setForeground(getSelectedColourSafe(i));
-                symbolBoxes[i].setRenderer(new SymbolComboBoxRenderer(i));
-                symbolBoxes[i].setForeground(getSelectedColourSafe(i));
-
-                String currentSymbol = (String) symbolBoxes[i].getSelectedItem();
-                String hex = toHex(getSelectedColourSafe(i));
-
-                typistTabbedPane.setTabComponentAt(i,
-                    createTypistTabLabel(getSymbolGlyph(currentSymbol), typistNames[i], hex)
-                );
-            }
-        }
-
-        updatingSymbols = false;
-        updateActiveRacersLabel();
-        saveCurrentOptions();
-    }
-
-    /**
-     * Replaces duplicate selections with the next available option.
-     *
-     * @param selections currently selected options
-     * @param availableOptions all possible options
-     */
-    private void removeDuplicateSelections(String[] selections, String[] availableOptions)
-    {
-        for (int i = 0; i < selections.length; i++)
-        {
-            if (selectionIsUsedEarlier(selections[i], selections, i))
-            {
-                selections[i] = getNextAvailableOption(selections[i], selections, availableOptions, i);
-            }
-        }
-    }
-
-    /**
-     * Checks whether an option has already been chosen by an earlier typist.
-     *
-     * @param selection selected option
-     * @param selections all selected options
-     * @param currentIndex current typist index
-     * @return true if an earlier typist already uses the option
-     */
-    private boolean selectionIsUsedEarlier(String selection, String[] selections, int currentIndex)
-    {
-        if (selection == null)
-        {
-            return true;
-        }
-
-        for (int i = 0; i < currentIndex; i++)
-        {
-            if (selection.equals(selections[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Gets the next option not already used by another typist.
-     *
-     * @param currentOption the duplicated option
-     * @param selections all selected options
-     * @param availableOptions all possible options
-     * @param currentIndex current typist index
-     * @return next available option
-     */
-    private String getNextAvailableOption(
-        String currentOption,
-        String[] selections,
-        String[] availableOptions,
-        int currentIndex)
-    {
-        int startIndex = getOptionIndex(currentOption, availableOptions);
-
-        for (int offset = 1; offset <= availableOptions.length; offset++)
-        {
-            String option = availableOptions[(startIndex + offset) % availableOptions.length];
-
-            if (!optionIsUsedByAnotherTypist(option, selections, currentIndex))
-            {
-                return option;
-            }
-        }
-
-        return currentOption;
-    }
-
-    /**
-     * Finds an option's index in the available option list.
-     *
-     * @param option option to find
-     * @param availableOptions all possible options
-     * @return option index, or 0 if not found
-     */
-    private int getOptionIndex(String option, String[] availableOptions)
-    {
-        for (int i = 0; i < availableOptions.length; i++)
-        {
-            if (availableOptions[i].equals(option))
-            {
-                return i;
-            }
-        }
-
-        return 0;
-    }
-
-    /**
-     * Checks whether an option is selected by another typist.
-     *
-     * @param option option to check
-     * @param selections all selected options
-     * @param currentIndex current typist index
-     * @return true if another typist uses the option
-     */
-    private boolean optionIsUsedByAnotherTypist(String option, String[] selections, int currentIndex)
-    {
-        for (int i = 0; i < selections.length; i++)
-        {
-            if (i != currentIndex && option.equals(selections[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Checks whether a colour is already selected by another typist.
-     *
-     * @param colour the colour to check
-     * @param selectedColours the currently selected colours
-     * @param currentIndex the typist currently being checked
-     * @return true if another typist already uses the colour
-     */
-    private boolean colourIsUsedByAnotherTypist(String colour, String[] selectedColours, int currentIndex)
-    {
-        for (int i = 0; i < selectedColours.length; i++)
-        {
-            if (i != currentIndex && colour.equals(selectedColours[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Updates all symbol dropdowns so a symbol already used by one typist
-     * cannot be selected by another typist.
-     */
-    private void updateSymbolAvailability()
-    {
-        if (updatingSymbols || symbolBoxes == null)
-        {
-            return;
-        }
-
-        updatingSymbols = true;
-
-        int count = (Integer) seatCountSpinner.getValue();
-        String[] selectedSymbols = new String[count];
-
-        for (int i = 0; i < count; i++)
-        {
-            if (symbolBoxes[i] != null)
-            {
-                selectedSymbols[i] = (String) symbolBoxes[i].getSelectedItem();
-            }
-        }
-
-        removeDuplicateSelections(selectedSymbols, availableSymbols);
-
-        for (int i = 0; i < count; i++)
-        {
-            if (symbolBoxes[i] != null)
-            {
-                String currentSymbol = selectedSymbols[i];
-
-                symbolBoxes[i].removeAllItems();
-
-                for (String symbol : availableSymbols)
-                {
-                    if (symbol.equals(currentSymbol) || !symbolIsUsedByAnotherTypist(symbol, selectedSymbols, i))
-                    {
-                        symbolBoxes[i].addItem(symbol);
-                    }
-                }
-
-                symbolBoxes[i].setSelectedItem(currentSymbol);
-                symbolBoxes[i].setRenderer(new SymbolComboBoxRenderer(i));
-                symbolBoxes[i].setForeground(getSelectedColourSafe(i));
-
-                String hex = toHex(getSelectedColourSafe(i));
-
-                typistTabbedPane.setTabComponentAt(i,
-                    createTypistTabLabel(getSymbolGlyph(currentSymbol), typistNames[i], hex)
-                );
-            }
-        }
-
-        updatingSymbols = false;
-        updateActiveRacersLabel();
-        saveCurrentOptions();
-    }
-
-    /**
-     * Checks whether a symbol is already selected by another typist.
-     *
-     * @param symbol the symbol to check
-     * @param selectedSymbols the currently selected symbols
-     * @param currentIndex the typist currently being checked
-     * @return true if another typist already uses the symbol
-     */
-    private boolean symbolIsUsedByAnotherTypist(String symbol, String[] selectedSymbols, int currentIndex)
-    {
-        for (int i = 0; i < selectedSymbols.length; i++)
-        {
-            if (i != currentIndex && symbol.equals(selectedSymbols[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Creates the accessories section for one typist.
      *
      * @param index the index of the typist
@@ -2849,15 +3663,54 @@ public class TypingRaceGUI
      */
     private JPanel createAccessoriesPanel(int index)
     {
-        JPanel panel = new JPanel(new GridLayout(4, 1, 8, 8));
+        JPanel panel = new JPanel(new GridLayout(6, 1, 8, 8));
         panel.setBorder(createThemedBorder("Accessories"));
 
         wristSupportBoxes[index] = new JCheckBox("Wrist Support");
         energyDrinkBoxes[index] = new JCheckBox("Energy Drink");
         noiseCancellingBoxes[index] = new JCheckBox("Noise-Cancelling Headphones");
+        postureSeatBoxes[index] = new JCheckBox("Gaming Chair");
+        coolingFanBoxes[index] = new JCheckBox("Cooling Fan");
         wristSupportBoxes[index].setSelected(savedWristSupports[index]);
         energyDrinkBoxes[index].setSelected(savedEnergyDrinks[index]);
         noiseCancellingBoxes[index].setSelected(savedNoiseCancelling[index]);
+        postureSeatBoxes[index].setSelected(savedPostureSeats[index]);
+        coolingFanBoxes[index].setSelected(savedCoolingFans[index]);
+        wristSupportBoxes[index].setEnabled(ownedUpgrades[index][keyboardUpgrades.length]);
+        energyDrinkBoxes[index].setEnabled(ownedUpgrades[index][keyboardUpgrades.length + 1]);
+        noiseCancellingBoxes[index].setEnabled(ownedUpgrades[index][keyboardUpgrades.length + 2]);
+        postureSeatBoxes[index].setEnabled(ownedUpgrades[index][keyboardUpgrades.length + 3]);
+        coolingFanBoxes[index].setEnabled(ownedUpgrades[index][keyboardUpgrades.length + 4]);
+
+        if (!ownedUpgrades[index][keyboardUpgrades.length])
+        {
+            wristSupportBoxes[index].setSelected(false);
+            savedWristSupports[index] = false;
+        }
+
+        if (!ownedUpgrades[index][keyboardUpgrades.length + 1])
+        {
+            energyDrinkBoxes[index].setSelected(false);
+            savedEnergyDrinks[index] = false;
+        }
+
+        if (!ownedUpgrades[index][keyboardUpgrades.length + 2])
+        {
+            noiseCancellingBoxes[index].setSelected(false);
+            savedNoiseCancelling[index] = false;
+        }
+
+        if (!ownedUpgrades[index][keyboardUpgrades.length + 3])
+        {
+            postureSeatBoxes[index].setSelected(false);
+            savedPostureSeats[index] = false;
+        }
+
+        if (!ownedUpgrades[index][keyboardUpgrades.length + 4])
+        {
+            coolingFanBoxes[index].setSelected(false);
+            savedCoolingFans[index] = false;
+        }
 
         impactLabels[index] = new JLabel("Impact: No accessories selected.");
 
@@ -2873,304 +3726,31 @@ public class TypingRaceGUI
             updateTypistImpact(index);
             saveCurrentOptions();
         });
+        postureSeatBoxes[index].addActionListener(e -> {
+            updateTypistImpact(index);
+            saveCurrentOptions();
+        });
+        coolingFanBoxes[index].addActionListener(e -> {
+            updateTypistImpact(index);
+            saveCurrentOptions();
+        });
 
         panel.add(wristSupportBoxes[index]);
         panel.add(energyDrinkBoxes[index]);
         panel.add(noiseCancellingBoxes[index]);
+        panel.add(postureSeatBoxes[index]);
+        panel.add(coolingFanBoxes[index]);
         panel.add(impactLabels[index]);
         styleSectionPanel(panel);
         styleCheckBox(wristSupportBoxes[index]);
         styleCheckBox(energyDrinkBoxes[index]);
         styleCheckBox(noiseCancellingBoxes[index]);
+        styleCheckBox(postureSeatBoxes[index]);
+        styleCheckBox(coolingFanBoxes[index]);
         styleImpactLabel(impactLabels[index]);
         updateTypistImpact(index);
 
         return panel;
-    }
-
-    /**
-     * Updates the impact label for one typist based on selected customisation options.
-     *
-     * @param index the index of the typist
-     */
-    private void updateTypistImpact(int index)
-    {
-        String impact = "Impact: ";
-
-        if (wristSupportBoxes[index].isSelected())
-        {
-            impact += "Lower burnout duration. ";
-        }
-
-        if (energyDrinkBoxes[index].isSelected())
-        {
-            impact += "Higher early accuracy and speed, lower later accuracy and speed. ";
-        }
-
-        if (noiseCancellingBoxes[index].isSelected())
-        {
-            impact += "Reduced mistype chance. ";
-        }
-
-        if (!wristSupportBoxes[index].isSelected() &&
-            !energyDrinkBoxes[index].isSelected() &&
-            !noiseCancellingBoxes[index].isSelected())
-        {
-            impact += "No accessories selected.";
-        }
-
-        impactLabels[index].setText(impact);
-    }
-
-    /**
-     * Saves the current configuration and typist customisation options.
-     */
-    private void saveCurrentOptions()
-    {
-        if (updatingSymbols)
-        {
-            return;
-        }
-
-        if (seatCountSpinner != null)
-        {
-            savedSeatCount = (Integer) seatCountSpinner.getValue();
-        }
-
-        if (passageComboBox != null)
-        {
-            savedPassageIndex = passageComboBox.getSelectedIndex();
-        }
-
-        if (customPassageArea != null)
-        {
-            if (showingCustomPassagePlaceholder)
-            {
-                savedCustomPassage = "";
-            }
-            else
-            {
-                savedCustomPassage = customPassageArea.getText();
-            }
-        }
-
-        if (autocorrectCheckBox != null)
-        {
-            savedAutocorrectSelected = autocorrectCheckBox.isSelected();
-        }
-
-        if (caffeineModeCheckBox != null)
-        {
-            savedCaffeineModeSelected = caffeineModeCheckBox.isSelected();
-        }
-
-        if (nightShiftCheckBox != null)
-        {
-            savedNightShiftSelected = nightShiftCheckBox.isSelected();
-        }
-
-        int count = savedSeatCount;
-
-        for (int i = 0; i < count && i < typistNames.length; i++)
-        {
-            if (typingStyleBoxes != null && i < typingStyleBoxes.length && typingStyleBoxes[i] != null)
-            {
-                savedTypingStyles[i] = (String) typingStyleBoxes[i].getSelectedItem();
-            }
-
-            if (keyboardTypeBoxes != null && i < keyboardTypeBoxes.length && keyboardTypeBoxes[i] != null)
-            {
-                savedKeyboardTypes[i] = (String) keyboardTypeBoxes[i].getSelectedItem();
-            }
-
-            if (symbolBoxes != null && i < symbolBoxes.length && symbolBoxes[i] != null &&
-                symbolBoxes[i].getSelectedItem() != null)
-            {
-                savedSymbols[i] = (String) symbolBoxes[i].getSelectedItem();
-            }
-
-            if (colourBoxes != null && i < colourBoxes.length && colourBoxes[i] != null &&
-                colourBoxes[i].getSelectedItem() != null)
-            {
-                savedColours[i] = (String) colourBoxes[i].getSelectedItem();
-            }
-
-            if (wristSupportBoxes != null && i < wristSupportBoxes.length && wristSupportBoxes[i] != null)
-            {
-                savedWristSupports[i] = wristSupportBoxes[i].isSelected();
-            }
-
-            if (energyDrinkBoxes != null && i < energyDrinkBoxes.length && energyDrinkBoxes[i] != null)
-            {
-                savedEnergyDrinks[i] = energyDrinkBoxes[i].isSelected();
-            }
-
-            if (noiseCancellingBoxes != null && i < noiseCancellingBoxes.length && noiseCancellingBoxes[i] != null)
-            {
-                savedNoiseCancelling[i] = noiseCancellingBoxes[i].isSelected();
-            }
-        }
-    }
-
-    /**
-     * Builds Typist objects from the current GUI customisation choices.
-     *
-     * @return an array of Typist objects
-     */
-    private Typist[] createTypistsFromGUI()
-    {
-        int seatCount = (Integer) seatCountSpinner.getValue();
-        Typist[] typists = new Typist[seatCount];
-
-        for (int i = 0; i < seatCount; i++)
-        {
-            String name = typistNames[i];
-            String selectedSymbol = (String) symbolBoxes[i].getSelectedItem();
-            char symbol = getSymbolGlyph(selectedSymbol).charAt(0);
-
-            double accuracy = 0.70;
-            speedModifiers[i] = 1.00;
-            mistypeRateModifiers[i] = 1.00;
-            burnoutChanceModifiers[i] = 1.00;
-            burnoutDurationModifiers[i] = 0;
-
-            String typingStyle = (String) typingStyleBoxes[i].getSelectedItem();
-            String keyboardType = (String) keyboardTypeBoxes[i].getSelectedItem();
-
-            if ("Touch Typist".equals(typingStyle))
-            {
-                accuracy = accuracy + 0.10;
-                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 0.90;
-            }
-            else if ("Hunt & Peck".equals(typingStyle))
-            {
-                accuracy = accuracy - 0.10;
-                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 0.80;
-            }
-            else if ("Phone Thumbs".equals(typingStyle))
-            {
-                accuracy = accuracy - 0.05;
-                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 1.25;
-                burnoutDurationModifiers[i] = burnoutDurationModifiers[i] + 1;
-            }
-            else if ("Voice-to-Text".equals(typingStyle))
-            {
-                accuracy = accuracy + 0.05;
-                burnoutChanceModifiers[i] = burnoutChanceModifiers[i] * 1.10;
-            }
-
-            if ("Mechanical".equals(keyboardType))
-            {
-                speedModifiers[i] = speedModifiers[i] * 1.15;
-                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 0.90;
-            }
-            else if ("Membrane".equals(keyboardType))
-            {
-                speedModifiers[i] = speedModifiers[i] * 0.95;
-                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.00;
-            }
-            else if ("Touchscreen".equals(keyboardType))
-            {
-                speedModifiers[i] = speedModifiers[i] * 0.90;
-                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.30;
-            }
-            else if ("Stenography".equals(keyboardType))
-            {
-                speedModifiers[i] = speedModifiers[i] * 1.35;
-                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.20;
-            }
-
-            if (nightShiftCheckBox.isSelected())
-            {
-                accuracy = accuracy - 0.05;
-                mistypeRateModifiers[i] = mistypeRateModifiers[i] * 1.15;
-            }
-
-            if (caffeineModeCheckBox.isSelected())
-            {
-                accuracy = accuracy + 0.03;
-                speedModifiers[i] = speedModifiers[i] * 1.10;
-            }
-
-            if (energyDrinkBoxes[i].isSelected())
-            {
-                accuracy = accuracy + 0.05;
-                speedModifiers[i] = speedModifiers[i] * 1.08;
-            }
-
-            typists[i] = new Typist(symbol, name, accuracy);
-        }
-
-        return typists;
-    }
-
-    /**
-     * Updates the currently selected passage.
-     * Enables custom input when selected and updates the passage length label.
-     */
-    private void updateSelectedPassage()
-    {
-        String selectedOption = (String) passageComboBox.getSelectedItem();
-
-        if ("Custom Passage".equals(selectedOption))
-        {
-            customPassageArea.setEnabled(true);
-            selectedPassage = getCustomPassageText();
-
-            if (selectedPassage.isEmpty() && !customPassageArea.hasFocus())
-            {
-                showCustomPassagePlaceholder();
-            }
-        }
-        else
-        {
-            customPassageArea.setEnabled(false);
-            selectedPassage = selectedOption.substring(selectedOption.indexOf(":") + 2);
-            if (customPassageArea.getText().trim().isEmpty())
-            {
-                showCustomPassagePlaceholder();
-            }
-        }
-
-        passageLengthLabel.setText("Passage length: " + selectedPassage.length() + " characters");
-    }
-
-    /**
-     * Gets the custom passage text while ignoring placeholder text.
-     *
-     * @return the custom passage typed by the user
-     */
-    private String getCustomPassageText()
-    {
-        if (showingCustomPassagePlaceholder)
-        {
-            return "";
-        }
-
-        return customPassageArea.getText();
-    }
-
-    /**
-     * Displays muted placeholder text in the custom passage area.
-     */
-    private void showCustomPassagePlaceholder()
-    {
-        showingCustomPassagePlaceholder = true;
-        customPassageArea.setForeground(TEXT_MUTED);
-        customPassageArea.setText(CUSTOM_PASSAGE_PLACEHOLDER);
-    }
-
-    /**
-     * Clears placeholder text when the user starts typing a custom passage.
-     */
-    private void clearCustomPassagePlaceholder()
-    {
-        if (showingCustomPassagePlaceholder)
-        {
-            showingCustomPassagePlaceholder = false;
-            customPassageArea.setText("");
-            customPassageArea.setForeground(TEXT_LIGHT);
-        }
     }
 
     /**
@@ -3280,6 +3860,10 @@ public class TypingRaceGUI
         styleImpactLabel(label);
         return panel;
     }
+
+    /*
+     * Styling and rendering helpers.
+     */
 
     /**
      * Applies the dark purple theme to a panel.
@@ -3613,18 +4197,31 @@ public class TypingRaceGUI
      */
     private javax.swing.border.Border createThemedBorder(String title)
     {
+        return createThemedBorder(title, TEXT_LIGHT);
+    }
+
+    /**
+     * Creates a purple titled border with a custom title colour.
+     *
+     * @param title the title shown on the border
+     * @param titleColour the title text colour
+     * @return the styled titled border
+     */
+    private javax.swing.border.Border createThemedBorder(String title, Color titleColour)
+    {
         javax.swing.border.TitledBorder border = BorderFactory.createTitledBorder(
             new RoundedLineBorder(PURPLE, 12),
             title
         );
 
-        border.setTitleColor(TEXT_LIGHT);
+        border.setTitleColor(titleColour);
         border.setTitleFont(new Font(UI_FONT_NAME, Font.BOLD, 13));
         return BorderFactory.createCompoundBorder(
             border,
             BorderFactory.createEmptyBorder(18, 18, 18, 18)
         );
     }
+
 
     /**
      * Custom renderer for the colour dropdown.
@@ -4223,7 +4820,7 @@ public class TypingRaceGUI
                 return new double[] {0.0, Math.ceil(max)};
             }
 
-            if ("Accuracy %".equals(metric))
+            if ("Race Accuracy %".equals(metric))
             {
                 if (min == Double.MAX_VALUE)
                 {
@@ -4263,7 +4860,7 @@ public class TypingRaceGUI
                 return String.valueOf((int) Math.round(value));
             }
 
-            if ("Accuracy %".equals(metric))
+            if ("Race Accuracy %".equals(metric))
             {
                 return String.valueOf((int) Math.round(value)) + "%";
             }
@@ -4307,6 +4904,8 @@ public class TypingRaceGUI
         private int mistypes;
         private int burnouts;
         private int rewardPoints;
+        private int coinsEarned;
+        private double skillAccuracy;
         private double accuracyChange;
 
         public RacePerformance(
@@ -4318,6 +4917,7 @@ public class TypingRaceGUI
             int mistypes,
             int burnouts,
             int rewardPoints,
+            int coinsEarned,
             double startAccuracy,
             double finalAccuracy)
         {
@@ -4329,6 +4929,8 @@ public class TypingRaceGUI
             this.mistypes = mistypes;
             this.burnouts = burnouts;
             this.rewardPoints = rewardPoints; 
+            this.coinsEarned = coinsEarned;
+            this.skillAccuracy = finalAccuracy;
             this.accuracyChange = finalAccuracy - startAccuracy;
         }
     }

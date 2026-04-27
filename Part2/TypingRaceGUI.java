@@ -1195,7 +1195,6 @@ public class TypingRaceGUI
         JTabbedPane statsTabs = new JTabbedPane();
 
         statsTabs.addTab("Leaderboard", createLeaderboardPanel());
-        statsTabs.addTab("Last Race", createLastRacePanel());
         statsTabs.addTab("Race History", createRaceHistoryPanel());
         statsTabs.addTab("Comparison", createComparisonPanel());
         statsTabs.addTab("Charts", createChartsPanel());
@@ -1603,6 +1602,7 @@ public class TypingRaceGUI
             replacePanelContent(tableHolder,
                 createComparisonTablePanel(selectedTypistIndexes, (String) metricBox.getSelectedItem())
             );
+            
         });
 
         JLabel typistsLabel = new JLabel("Typists:");
@@ -1632,6 +1632,12 @@ public class TypingRaceGUI
         }
         styleComboBox(metricBox);
         styleButton(compareButton);
+
+        for (int i = 0; i < typistSelectionBoxes.length; i++)
+        {
+            styleCheckBox(typistSelectionBoxes[i]);
+            typistSelectionBoxes[i].setForeground(getTypistDisplayColour(recordedTypistIndexes[i]));
+        }
 
         return panel;
     }
@@ -4011,7 +4017,7 @@ public class TypingRaceGUI
             this.accuracyPercent = accuracyPercent;
             this.mistypes = mistypes;
             this.burnouts = burnouts;
-            this.rewardPoints = rewardPoints;
+            this.rewardPoints = rewardPoints; 
             this.accuracyChange = finalAccuracy - startAccuracy;
         }
     }

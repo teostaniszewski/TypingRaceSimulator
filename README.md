@@ -104,7 +104,8 @@ The GUI can also be started through the `main` method inside `TypingRaceGUI.java
 
 ```java
 public static void main(String[] args) {
-    new TypingRaceGUI();
+    TypingRaceGUI gui = new TypingRaceGUI();
+    gui.startRaceGUI();
 }
 ```
 

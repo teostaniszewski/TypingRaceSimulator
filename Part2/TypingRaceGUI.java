@@ -66,6 +66,19 @@ public class TypingRaceGUI
     private boolean updatingSymbols;
     private boolean showingCustomPassagePlaceholder;
     private String selectedPassage;
+    private int savedSeatCount;
+    private int savedPassageIndex;
+    private String savedCustomPassage;
+    private boolean savedAutocorrectSelected;
+    private boolean savedCaffeineModeSelected;
+    private boolean savedNightShiftSelected;
+    private String[] savedTypingStyles;
+    private String[] savedKeyboardTypes;
+    private String[] savedSymbols;
+    private String[] savedColours;
+    private boolean[] savedWristSupports;
+    private boolean[] savedEnergyDrinks;
+    private boolean[] savedNoiseCancelling;
 
     private int[] mistypeCounts;
     private int[] burnoutCounts;
@@ -128,6 +141,13 @@ public class TypingRaceGUI
         "Yellow"
     };
 
+    private final String[] passageOptions = {
+        "Short: The quick brown fox jumps over the lazy dog.",
+        "Medium: Java Swing allows developers to build interactive graphical applications.",
+        "Long: Object oriented programming helps structure larger programs by separating data and behaviour into classes and objects.",
+        "Custom Passage"
+    };
+
     /**
      * Constructor for TypingRaceGUI.
      * Initialises the GUI and sets up the window.
@@ -140,6 +160,7 @@ public class TypingRaceGUI
         consecutiveWinCounts = new int[typistNames.length];
         lastRacePerformances = new RacePerformance[0];
         initialiseRaceHistories();
+        initialiseSavedOptions();
         updatingSymbols = false;
         showingCustomPassagePlaceholder = false;
         raceNumber = 0;
@@ -175,6 +196,35 @@ public class TypingRaceGUI
         for (int i = 0; i < typistRaceHistories.length; i++)
         {
             typistRaceHistories[i] = new ArrayList<>();
+        }
+    }
+
+    /**
+     * Initialises saved setup choices so rebuilt screens remember previous options.
+     */
+    private void initialiseSavedOptions()
+    {
+        savedSeatCount = 2;
+        savedPassageIndex = 0;
+        savedCustomPassage = "";
+        savedAutocorrectSelected = false;
+        savedCaffeineModeSelected = false;
+        savedNightShiftSelected = false;
+
+        savedTypingStyles = new String[typistNames.length];
+        savedKeyboardTypes = new String[typistNames.length];
+        savedSymbols = new String[typistNames.length];
+        savedColours = new String[typistNames.length];
+        savedWristSupports = new boolean[typistNames.length];
+        savedEnergyDrinks = new boolean[typistNames.length];
+        savedNoiseCancelling = new boolean[typistNames.length];
+
+        for (int i = 0; i < typistNames.length; i++)
+        {
+            savedTypingStyles[i] = "Touch Typist";
+            savedKeyboardTypes[i] = "Mechanical";
+            savedSymbols[i] = availableSymbols[i];
+            savedColours[i] = availableColours[i];
         }
     }
 
@@ -325,19 +375,15 @@ public class TypingRaceGUI
     {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
 
-        String[] passages = {
-            "Short: The quick brown fox jumps over the lazy dog.",
-            "Medium: Java Swing allows developers to build interactive graphical applications.",
-            "Long: Object oriented programming helps structure larger programs by separating data and behaviour into classes and objects.",
-            "Custom Passage"
-        };
-
-        passageComboBox = new JComboBox<>(passages);
+        passageComboBox = new JComboBox<>(passageOptions);
+        passageComboBox.setSelectedIndex(savedPassageIndex);
 
         customPassageArea = new JTextArea(4, 40);
         customPassageArea.setEnabled(false);
         customPassageArea.setLineWrap(true);
         customPassageArea.setWrapStyleWord(true);
+        customPassageArea.setText(savedCustomPassage);
+        showingCustomPassagePlaceholder = false;
 
         JScrollPane scrollPane = new JScrollPane(customPassageArea);
         scrollPane.setPreferredSize(new Dimension(0, 92));
@@ -345,12 +391,16 @@ public class TypingRaceGUI
         passageLengthLabel = new JLabel("Passage length: 44 characters");
         passageLengthLabel.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
 
-        passageComboBox.addActionListener(e -> updateSelectedPassage());
+        passageComboBox.addActionListener(e -> {
+            updateSelectedPassage();
+            saveCurrentOptions();
+        });
 
         customPassageArea.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyReleased(java.awt.event.KeyEvent e)
             {
                 updateSelectedPassage();
+                saveCurrentOptions();
             }
         });
 
@@ -372,6 +422,7 @@ public class TypingRaceGUI
                 }
 
                 updateSelectedPassage();
+                saveCurrentOptions();
             }
         });
 
@@ -385,7 +436,11 @@ public class TypingRaceGUI
         styleComboBox(passageComboBox);
         styleTextArea(customPassageArea);
         styleScrollPane(scrollPane);
-        showCustomPassagePlaceholder();
+
+        if (savedCustomPassage.trim().isEmpty())
+        {
+            showCustomPassagePlaceholder();
+        }
 
         return panel;
     }
@@ -401,7 +456,7 @@ public class TypingRaceGUI
 
         JLabel label = new JLabel("Number of racers:");
 
-        SpinnerNumberModel spinnerModel = new SpinnerNumberModel(2, 2, 6, 1);
+        SpinnerNumberModel spinnerModel = new SpinnerNumberModel(savedSeatCount, 2, 6, 1);
         seatCountSpinner = new JSpinner(spinnerModel);
         seatCountSpinner.setPreferredSize(new Dimension(70, 34));
         activeRacersLabel = new JLabel();
@@ -411,6 +466,7 @@ public class TypingRaceGUI
         editor.getTextField().setHorizontalAlignment(JTextField.CENTER);
 
         seatCountSpinner.addChangeListener(e -> {
+            saveCurrentOptions();
             updateTypistTabs();
             updateActiveRacersLabel();
         });
@@ -474,6 +530,10 @@ public class TypingRaceGUI
         nightShiftCheckBox = new JCheckBox("Night Shift");
         difficultyImpactLabel = new JLabel("Impact: No difficulty modifiers selected.");
 
+        autocorrectCheckBox.setSelected(savedAutocorrectSelected);
+        caffeineModeCheckBox.setSelected(savedCaffeineModeSelected);
+        nightShiftCheckBox.setSelected(savedNightShiftSelected);
+
         optionsPanel.add(autocorrectCheckBox);
         optionsPanel.add(Box.createVerticalStrut(4));
         optionsPanel.add(caffeineModeCheckBox);
@@ -483,9 +543,18 @@ public class TypingRaceGUI
         optionsPanel.add(difficultyImpactLabel);
         panel.add(optionsPanel, BorderLayout.WEST);
 
-        autocorrectCheckBox.addActionListener(e -> updateDifficultyImpact());
-        caffeineModeCheckBox.addActionListener(e -> updateDifficultyImpact());
-        nightShiftCheckBox.addActionListener(e -> updateDifficultyImpact());
+        autocorrectCheckBox.addActionListener(e -> {
+            updateDifficultyImpact();
+            saveCurrentOptions();
+        });
+        caffeineModeCheckBox.addActionListener(e -> {
+            updateDifficultyImpact();
+            saveCurrentOptions();
+        });
+        nightShiftCheckBox.addActionListener(e -> {
+            updateDifficultyImpact();
+            saveCurrentOptions();
+        });
 
         styleSectionPanel(panel);
         styleSectionPanel(optionsPanel);
@@ -493,6 +562,7 @@ public class TypingRaceGUI
         styleCheckBox(caffeineModeCheckBox);
         styleCheckBox(nightShiftCheckBox);
         styleImpactLabel(difficultyImpactLabel);
+        updateDifficultyImpact();
         return panel;
     }
 
@@ -553,6 +623,8 @@ public class TypingRaceGUI
      */
     private void showRaceScreen()
     {
+        saveCurrentOptions();
+
         if (selectedPassage.trim().isEmpty())
         {
             JOptionPane.showMessageDialog(frame,
@@ -2168,6 +2240,7 @@ public class TypingRaceGUI
             return;
         }
 
+        saveCurrentOptions();
         int count = (Integer) seatCountSpinner.getValue();
 
         typingStyleBoxes = (JComboBox<String>[]) new JComboBox<?>[count];
@@ -2274,11 +2347,15 @@ public class TypingRaceGUI
         };
 
         typingStyleBoxes[index] = new JComboBox<>(typingStyles);
+        typingStyleBoxes[index].setSelectedItem(savedTypingStyles[index]);
         JLabel chooseLabel = new JLabel("Choose typing style:");
         typingStyleImpactLabels[index] = new JLabel();
         updateTypingStyleImpact(index);
 
-        typingStyleBoxes[index].addActionListener(e -> updateTypingStyleImpact(index));
+        typingStyleBoxes[index].addActionListener(e -> {
+            updateTypingStyleImpact(index);
+            saveCurrentOptions();
+        });
 
         panel.add(chooseLabel);
         panel.add(typingStyleBoxes[index]);
@@ -2310,11 +2387,15 @@ public class TypingRaceGUI
         };
 
         keyboardTypeBoxes[index] = new JComboBox<>(keyboardTypes);
+        keyboardTypeBoxes[index].setSelectedItem(savedKeyboardTypes[index]);
         JLabel chooseLabel = new JLabel("Choose keyboard type:");
         keyboardTypeImpactLabels[index] = new JLabel();
         updateKeyboardTypeImpact(index);
 
-        keyboardTypeBoxes[index].addActionListener(e -> updateKeyboardTypeImpact(index));
+        keyboardTypeBoxes[index].addActionListener(e -> {
+            updateKeyboardTypeImpact(index);
+            saveCurrentOptions();
+        });
 
         panel.add(chooseLabel);
         panel.add(keyboardTypeBoxes[index]);
@@ -2429,16 +2510,22 @@ public class TypingRaceGUI
         panel.setBorder(createThemedBorder("Symbol and Colour"));
 
         symbolBoxes[index] = new JComboBox<>(availableSymbols);
-        symbolBoxes[index].setSelectedItem(availableSymbols[index]);
+        symbolBoxes[index].setSelectedItem(savedSymbols[index]);
         symbolBoxes[index].setRenderer(new SymbolComboBoxRenderer(index));
         symbolBoxes[index].setForeground(getSelectedColourSafe(index));
-        symbolBoxes[index].addActionListener(e -> updateSymbolAvailability());
+        symbolBoxes[index].addActionListener(e -> {
+            updateSymbolAvailability();
+            saveCurrentOptions();
+        });
 
         colourBoxes[index] = new JComboBox<>(availableColours);
-        colourBoxes[index].setSelectedItem(availableColours[index]);
+        colourBoxes[index].setSelectedItem(savedColours[index]);
         colourBoxes[index].setRenderer(new ColourComboBoxRenderer());
         colourBoxes[index].setForeground(getSelectedColourSafe(index));
-        colourBoxes[index].addActionListener(e -> updateColourAvailability());
+        colourBoxes[index].addActionListener(e -> {
+            updateColourAvailability();
+            saveCurrentOptions();
+        });
 
         JLabel symbolLabel = new JLabel("Typist symbol:");
         JLabel colourLabel = new JLabel("Progress colour:");
@@ -2501,6 +2588,8 @@ public class TypingRaceGUI
             }
         }
 
+        removeDuplicateSelections(selectedColours, availableColours);
+
         for (int i = 0; i < count; i++)
         {
             if (colourBoxes[i] != null)
@@ -2534,6 +2623,121 @@ public class TypingRaceGUI
 
         updatingSymbols = false;
         updateActiveRacersLabel();
+        saveCurrentOptions();
+    }
+
+    /**
+     * Replaces duplicate selections with the next available option.
+     *
+     * @param selections currently selected options
+     * @param availableOptions all possible options
+     */
+    private void removeDuplicateSelections(String[] selections, String[] availableOptions)
+    {
+        for (int i = 0; i < selections.length; i++)
+        {
+            if (selectionIsUsedEarlier(selections[i], selections, i))
+            {
+                selections[i] = getNextAvailableOption(selections[i], selections, availableOptions, i);
+            }
+        }
+    }
+
+    /**
+     * Checks whether an option has already been chosen by an earlier typist.
+     *
+     * @param selection selected option
+     * @param selections all selected options
+     * @param currentIndex current typist index
+     * @return true if an earlier typist already uses the option
+     */
+    private boolean selectionIsUsedEarlier(String selection, String[] selections, int currentIndex)
+    {
+        if (selection == null)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < currentIndex; i++)
+        {
+            if (selection.equals(selections[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Gets the next option not already used by another typist.
+     *
+     * @param currentOption the duplicated option
+     * @param selections all selected options
+     * @param availableOptions all possible options
+     * @param currentIndex current typist index
+     * @return next available option
+     */
+    private String getNextAvailableOption(
+        String currentOption,
+        String[] selections,
+        String[] availableOptions,
+        int currentIndex)
+    {
+        int startIndex = getOptionIndex(currentOption, availableOptions);
+
+        for (int offset = 1; offset <= availableOptions.length; offset++)
+        {
+            String option = availableOptions[(startIndex + offset) % availableOptions.length];
+
+            if (!optionIsUsedByAnotherTypist(option, selections, currentIndex))
+            {
+                return option;
+            }
+        }
+
+        return currentOption;
+    }
+
+    /**
+     * Finds an option's index in the available option list.
+     *
+     * @param option option to find
+     * @param availableOptions all possible options
+     * @return option index, or 0 if not found
+     */
+    private int getOptionIndex(String option, String[] availableOptions)
+    {
+        for (int i = 0; i < availableOptions.length; i++)
+        {
+            if (availableOptions[i].equals(option))
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Checks whether an option is selected by another typist.
+     *
+     * @param option option to check
+     * @param selections all selected options
+     * @param currentIndex current typist index
+     * @return true if another typist uses the option
+     */
+    private boolean optionIsUsedByAnotherTypist(String option, String[] selections, int currentIndex)
+    {
+        for (int i = 0; i < selections.length; i++)
+        {
+            if (i != currentIndex && option.equals(selections[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -2581,6 +2785,8 @@ public class TypingRaceGUI
             }
         }
 
+        removeDuplicateSelections(selectedSymbols, availableSymbols);
+
         for (int i = 0; i < count; i++)
         {
             if (symbolBoxes[i] != null)
@@ -2610,6 +2816,8 @@ public class TypingRaceGUI
         }
 
         updatingSymbols = false;
+        updateActiveRacersLabel();
+        saveCurrentOptions();
     }
 
     /**
@@ -2647,12 +2855,24 @@ public class TypingRaceGUI
         wristSupportBoxes[index] = new JCheckBox("Wrist Support");
         energyDrinkBoxes[index] = new JCheckBox("Energy Drink");
         noiseCancellingBoxes[index] = new JCheckBox("Noise-Cancelling Headphones");
+        wristSupportBoxes[index].setSelected(savedWristSupports[index]);
+        energyDrinkBoxes[index].setSelected(savedEnergyDrinks[index]);
+        noiseCancellingBoxes[index].setSelected(savedNoiseCancelling[index]);
 
         impactLabels[index] = new JLabel("Impact: No accessories selected.");
 
-        wristSupportBoxes[index].addActionListener(e -> updateTypistImpact(index));
-        energyDrinkBoxes[index].addActionListener(e -> updateTypistImpact(index));
-        noiseCancellingBoxes[index].addActionListener(e -> updateTypistImpact(index));
+        wristSupportBoxes[index].addActionListener(e -> {
+            updateTypistImpact(index);
+            saveCurrentOptions();
+        });
+        energyDrinkBoxes[index].addActionListener(e -> {
+            updateTypistImpact(index);
+            saveCurrentOptions();
+        });
+        noiseCancellingBoxes[index].addActionListener(e -> {
+            updateTypistImpact(index);
+            saveCurrentOptions();
+        });
 
         panel.add(wristSupportBoxes[index]);
         panel.add(energyDrinkBoxes[index]);
@@ -2663,6 +2883,7 @@ public class TypingRaceGUI
         styleCheckBox(energyDrinkBoxes[index]);
         styleCheckBox(noiseCancellingBoxes[index]);
         styleImpactLabel(impactLabels[index]);
+        updateTypistImpact(index);
 
         return panel;
     }
@@ -2699,6 +2920,96 @@ public class TypingRaceGUI
         }
 
         impactLabels[index].setText(impact);
+    }
+
+    /**
+     * Saves the current configuration and typist customisation options.
+     */
+    private void saveCurrentOptions()
+    {
+        if (updatingSymbols)
+        {
+            return;
+        }
+
+        if (seatCountSpinner != null)
+        {
+            savedSeatCount = (Integer) seatCountSpinner.getValue();
+        }
+
+        if (passageComboBox != null)
+        {
+            savedPassageIndex = passageComboBox.getSelectedIndex();
+        }
+
+        if (customPassageArea != null)
+        {
+            if (showingCustomPassagePlaceholder)
+            {
+                savedCustomPassage = "";
+            }
+            else
+            {
+                savedCustomPassage = customPassageArea.getText();
+            }
+        }
+
+        if (autocorrectCheckBox != null)
+        {
+            savedAutocorrectSelected = autocorrectCheckBox.isSelected();
+        }
+
+        if (caffeineModeCheckBox != null)
+        {
+            savedCaffeineModeSelected = caffeineModeCheckBox.isSelected();
+        }
+
+        if (nightShiftCheckBox != null)
+        {
+            savedNightShiftSelected = nightShiftCheckBox.isSelected();
+        }
+
+        int count = savedSeatCount;
+
+        for (int i = 0; i < count && i < typistNames.length; i++)
+        {
+            if (typingStyleBoxes != null && i < typingStyleBoxes.length && typingStyleBoxes[i] != null)
+            {
+                savedTypingStyles[i] = (String) typingStyleBoxes[i].getSelectedItem();
+            }
+
+            if (keyboardTypeBoxes != null && i < keyboardTypeBoxes.length && keyboardTypeBoxes[i] != null)
+            {
+                savedKeyboardTypes[i] = (String) keyboardTypeBoxes[i].getSelectedItem();
+            }
+
+            if (symbolBoxes != null && i < symbolBoxes.length && symbolBoxes[i] != null &&
+                symbolBoxes[i].getSelectedItem() != null)
+            {
+                savedSymbols[i] = (String) symbolBoxes[i].getSelectedItem();
+            }
+
+            if (colourBoxes != null && i < colourBoxes.length && colourBoxes[i] != null &&
+                colourBoxes[i].getSelectedItem() != null)
+            {
+                savedColours[i] = (String) colourBoxes[i].getSelectedItem();
+            }
+
+            if (wristSupportBoxes != null && i < wristSupportBoxes.length && wristSupportBoxes[i] != null)
+            {
+                savedWristSupports[i] = wristSupportBoxes[i].isSelected();
+            }
+
+            if (energyDrinkBoxes != null && i < energyDrinkBoxes.length && energyDrinkBoxes[i] != null)
+            {
+                savedEnergyDrinks[i] = energyDrinkBoxes[i].isSelected();
+            }
+
+            if (noiseCancellingBoxes != null && i < noiseCancellingBoxes.length && noiseCancellingBoxes[i] != null)
+            {
+                savedNoiseCancelling[i] = noiseCancellingBoxes[i].isSelected();
+            }
+        }
     }
 
     /**

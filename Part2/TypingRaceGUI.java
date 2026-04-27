@@ -75,6 +75,7 @@ public class TypingRaceGUI
     private static final Color TEXT_LIGHT = new Color(245, 245, 255);
     private static final Color TEXT_MUTED = new Color(180, 190, 210);
     private static final String CUSTOM_PASSAGE_PLACEHOLDER = "Type your custom passage here...";
+    private static final String UI_FONT_NAME = "Segoe UI Symbol";
 
     private static final double MISTYPE_BASE_CHANCE = 0.30;
     private static final int SLIDE_BACK_AMOUNT = 2;
@@ -133,7 +134,7 @@ public class TypingRaceGUI
 
         frame = new JFrame("Typing Race Simulator");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1250, 800);
+        frame.setSize(1500, 850);
         frame.setLocationRelativeTo(null);
         frame.getContentPane().setBackground(BG_DARK);
 
@@ -269,7 +270,7 @@ public class TypingRaceGUI
     {
         textArea.setBackground(PANEL_DARK);
         textArea.setForeground(TEXT_LIGHT);
-        textArea.setFont(new Font("Arial", Font.BOLD, 14));
+        textArea.setFont(new Font(UI_FONT_NAME, Font.BOLD, 14));
         textArea.setCaretColor(TEXT_LIGHT);
         textArea.setSelectionColor(PURPLE_DARK);
         textArea.setSelectedTextColor(Color.WHITE);
@@ -287,7 +288,7 @@ public class TypingRaceGUI
     {
         textPane.setBackground(PANEL_DARK);
         textPane.setForeground(TEXT_LIGHT);
-        textPane.setFont(new Font("Arial", Font.BOLD, 15));
+        textPane.setFont(new Font(UI_FONT_NAME, Font.BOLD, 15));
         textPane.setCaretColor(TEXT_LIGHT);
         textPane.setSelectionColor(PURPLE_DARK);
         textPane.setSelectedTextColor(Color.WHITE);
@@ -304,36 +305,11 @@ public class TypingRaceGUI
     {
         comboBox.setBackground(PANEL_DARK);
         comboBox.setForeground(TEXT_LIGHT);
-        comboBox.setFont(getUnicodeFriendlyFont(Font.BOLD, 13));
+        comboBox.setFont(new Font(UI_FONT_NAME, Font.BOLD, 13));
         comboBox.setBorder(new RoundedLineBorder(PURPLE_DARK, 10));
         comboBox.setFocusable(false);
         comboBox.setPreferredSize(new Dimension(comboBox.getPreferredSize().width, 38));
         comboBox.setUI(new ThemedComboBoxUI());
-    }
-
-    /**
-     * Returns a font suitable for rendering Unicode symbols.
-     * Falls back to a normal UI font if no symbol-capable font is available.
-     *
-     * @param style the font style
-     * @param size the font size
-     * @return a Font that can display the symbol glyphs
-     */
-    private Font getUnicodeFriendlyFont(int style, int size)
-    {
-        String[] candidates = {"Segoe UI Symbol", "Arial Unicode MS", "Segoe UI", "Arial"};
-        String glyphs = "■▲◆★●✕";
-
-        for (String candidate : candidates)
-        {
-            Font font = new Font(candidate, style, size);
-            if (font.canDisplayUpTo(glyphs) == -1)
-            {
-                return font;
-            }
-        }
-
-        return new Font("Arial", style, size);
     }
 
     /**
@@ -345,7 +321,7 @@ public class TypingRaceGUI
     {
         checkBox.setBackground(PANEL_DARK);
         checkBox.setForeground(TEXT_LIGHT);
-        checkBox.setFont(new Font("Arial", Font.BOLD, 13));
+        checkBox.setFont(new Font(UI_FONT_NAME, Font.BOLD, 13));
         checkBox.setFocusPainted(false);
         checkBox.setBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0));
     }
@@ -382,7 +358,7 @@ public class TypingRaceGUI
         tabbedPane.setBackground(BG_DARK);
         tabbedPane.setForeground(TEXT_LIGHT);
         tabbedPane.setOpaque(true);
-        tabbedPane.setFont(getUnicodeFriendlyFont(Font.BOLD, 12));
+        tabbedPane.setFont(new Font(UI_FONT_NAME, Font.BOLD, 12));
         tabbedPane.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
     }
 
@@ -400,7 +376,7 @@ public class TypingRaceGUI
             "<html><span style=\"font-family:'Segoe UI Symbol'; color:" + hexColour + ";\">"
             + symbolGlyph + "</span> <span style=\"color:#f5f5ff;\">" + name + "</span></html>"
         );
-        label.setFont(getUnicodeFriendlyFont(Font.BOLD, 12));
+        label.setFont(new Font(UI_FONT_NAME, Font.BOLD, 12));
         label.setOpaque(false);
         return label;
     }
@@ -500,63 +476,6 @@ public class TypingRaceGUI
     }
 
     /**
-     * Themes common Swing components inside a container.
-     *
-     * @param container the container whose children should be styled
-     */
-    private void styleComponentTree(Container container)
-    {
-        for (Component component : container.getComponents())
-        {
-            if (component instanceof JLabel)
-            {
-                styleLabel((JLabel) component);
-            }
-            else if (component instanceof JButton)
-            {
-                styleButton((JButton) component);
-            }
-            else if (component instanceof JCheckBox)
-            {
-                styleCheckBox((JCheckBox) component);
-            }
-            else if (component instanceof JComboBox)
-            {
-                styleComboBox((JComboBox<?>) component);
-            }
-            else if (component instanceof JTextArea)
-            {
-                styleTextArea((JTextArea) component);
-            }
-            else if (component instanceof JTextPane)
-            {
-                styleTextPane((JTextPane) component);
-            }
-            else if (component instanceof JScrollPane)
-            {
-                styleScrollPane((JScrollPane) component);
-            }
-            else if (component instanceof JTabbedPane)
-            {
-                styleTabbedPane((JTabbedPane) component);
-            }
-            else if (component instanceof JSpinner)
-            {
-                styleSpinner((JSpinner) component);
-            }
-            else if (component instanceof JPanel)
-            {
-                stylePanel((JPanel) component);
-            }
-
-            if (component instanceof Container)
-            {
-                styleComponentTree((Container) component);
-            }
-        }
-    }
-
-    /**
      * Creates a purple titled border for grouped GUI sections.
      *
      * @param title the title shown on the border
@@ -570,7 +489,7 @@ public class TypingRaceGUI
         );
 
         border.setTitleColor(TEXT_LIGHT);
-        border.setTitleFont(getUnicodeFriendlyFont(Font.BOLD, 13));
+        border.setTitleFont(new Font(UI_FONT_NAME, Font.BOLD, 13));
         return BorderFactory.createCompoundBorder(
             border,
             BorderFactory.createEmptyBorder(18, 18, 18, 18)
@@ -660,7 +579,7 @@ public class TypingRaceGUI
         protected JButton createArrowButton()
         {
             JButton button = new JButton("▼");
-            button.setFont(new Font("Arial", Font.BOLD, 9));
+            button.setFont(new Font(UI_FONT_NAME, Font.BOLD, 9));
             button.setForeground(TEXT_MUTED);
             button.setBackground(PANEL_DARK);
             button.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, PURPLE_DARK));
@@ -1112,7 +1031,7 @@ public class TypingRaceGUI
             typist.getSymbol() + " " + typist.getName()
         );
         laneBorder.setTitleColor(getSelectedColourSafe(index));
-        laneBorder.setTitleFont(getUnicodeFriendlyFont(Font.BOLD, 13));
+        laneBorder.setTitleFont(new Font(UI_FONT_NAME, Font.BOLD, 13));
         lanePanel.setBorder(BorderFactory.createCompoundBorder(
             laneBorder,
             BorderFactory.createEmptyBorder(18, 18, 18, 18)
@@ -1121,7 +1040,7 @@ public class TypingRaceGUI
         JTextPane passagePane = new JTextPane();
         passagePane.setEditable(false);
         passagePane.setText(selectedPassage);
-        passagePane.setFont(new Font("Arial", Font.BOLD, 15));
+        passagePane.setFont(new Font(UI_FONT_NAME, Font.BOLD, 15));
         passagePane.setPreferredSize(new Dimension(0, 76));
         raceTextPanes[index] = passagePane;
 
@@ -2079,10 +1998,10 @@ public class TypingRaceGUI
             setOpaque(true);
 
             colourSquare = new JLabel("■");
-            colourSquare.setFont(new Font("Arial", Font.BOLD, 16));
+            colourSquare.setFont(new Font(UI_FONT_NAME, Font.BOLD, 16));
 
             colourName = new JLabel();
-            colourName.setFont(new Font("Arial", Font.BOLD, 12));
+            colourName.setFont(new Font(UI_FONT_NAME, Font.BOLD, 12));
 
             add(colourSquare);
             add(colourName);
@@ -2134,7 +2053,7 @@ public class TypingRaceGUI
         {
             this.typistIndex = typistIndex;
             setOpaque(true);
-            setFont(getUnicodeFriendlyFont(Font.BOLD, 15));
+            setFont(new Font(UI_FONT_NAME, Font.BOLD, 15));
             setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 8));
         }
 

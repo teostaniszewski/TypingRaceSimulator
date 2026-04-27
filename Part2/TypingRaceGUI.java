@@ -1,6 +1,11 @@
 package Part2;
 
 import javax.swing.*;
+import javax.swing.border.AbstractBorder;
+import javax.swing.plaf.basic.BasicButtonUI;
+import javax.swing.plaf.basic.BasicComboBoxUI;
+import javax.swing.plaf.basic.BasicScrollBarUI;
+import javax.swing.plaf.basic.BasicTabbedPaneUI;
 import javax.swing.text.*;
 import java.awt.*;
 
@@ -44,8 +49,10 @@ public class TypingRaceGUI
 
     private JButton startRaceButton;
     private JButton viewStatsButton;
+    private JLabel raceWinnerLabel;
 
     private boolean updatingSymbols;
+    private boolean showingCustomPassagePlaceholder;
     private String selectedPassage;
 
     private int[] mistypeCounts;
@@ -61,6 +68,14 @@ public class TypingRaceGUI
     private String raceHistoryText;
     private int raceNumber;
 
+    private static final Color BG_DARK = new Color(11, 17, 32);
+    private static final Color PANEL_DARK = new Color(17, 24, 39);
+    private static final Color PURPLE = new Color(139, 92, 246);
+    private static final Color PURPLE_DARK = new Color(49, 46, 129);
+    private static final Color TEXT_LIGHT = new Color(245, 245, 255);
+    private static final Color TEXT_MUTED = new Color(180, 190, 210);
+    private static final String CUSTOM_PASSAGE_PLACEHOLDER = "Type your custom passage here...";
+
     private static final double MISTYPE_BASE_CHANCE = 0.30;
     private static final int SLIDE_BACK_AMOUNT = 2;
     private static final int BURNOUT_DURATION = 3;
@@ -75,7 +90,22 @@ public class TypingRaceGUI
     };
 
     private final String[] availableSymbols = {
-        "■", "▲", "◆", "★", "⬤", "✖"
+        "\u25A0 Block",
+        "\u25B2 Triangle",
+        "\u25C6 Diamond",
+        "\u2605 Star",
+        "\u25CF Circle",
+        "\u2715 Cross"
+    };
+
+    private final String[] availableColours = {
+        "Cyan",
+        "Green",
+        "Pink",
+        "Purple",
+        "Orange",
+        "Red",
+        "Yellow"
     };
 
     /**
@@ -88,6 +118,7 @@ public class TypingRaceGUI
         lastRaceStats = "No race has been run yet.\n\nStart a race to see statistics here.";
         bestWpmRecords = new double[typistNames.length];
         updatingSymbols = false;
+        showingCustomPassagePlaceholder = false;
         raceHistoryText = "No race history available yet.";
         raceNumber = 0;
         createWindow();
@@ -98,10 +129,13 @@ public class TypingRaceGUI
      */
     private void createWindow()
     {
+        configureThemeDefaults();
+
         frame = new JFrame("Typing Race Simulator");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1250, 750);
+        frame.setSize(1250, 800);
         frame.setLocationRelativeTo(null);
+        frame.getContentPane().setBackground(BG_DARK);
 
         frame.add(createMainPanel());
         frame.setVisible(true);
@@ -114,11 +148,13 @@ public class TypingRaceGUI
      */
     private JPanel createMainPanel()
     {
-        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        JPanel mainPanel = new JPanel(new BorderLayout(12, 18));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(24, 30, 26, 30));
 
-        JLabel titleLabel = new JLabel("Typing Race Simulator", JLabel.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 26));
+        JLabel titleLabel = new JLabel("< Typing Race Simulator />", JLabel.CENTER);
+        titleLabel.setFont(new Font("Consolas", Font.BOLD, 30));
+        titleLabel.setForeground(PURPLE);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 
         JTabbedPane tabbedPane = new JTabbedPane();
         tabbedPane.addTab("Race Configuration", createRaceConfigurationPanel());
@@ -127,6 +163,8 @@ public class TypingRaceGUI
 
         mainPanel.add(titleLabel, BorderLayout.NORTH);
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
+        styleTabbedPane(tabbedPane);
+        stylePanel(mainPanel);
 
         return mainPanel;
     }
@@ -140,25 +178,653 @@ public class TypingRaceGUI
     {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(42, 24, 22, 24));
 
         JPanel passageBox = createPassageSection();
-        passageBox.setBorder(BorderFactory.createTitledBorder("Passage Selection"));
+        passageBox.setBorder(createThemedBorder("Passage Selection"));
+        passageBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 230));
 
         JPanel seatBox = createSeatCountSection();
-        seatBox.setBorder(BorderFactory.createTitledBorder("Seat Count"));
+        seatBox.setBorder(createThemedBorder("Seat Count"));
+        seatBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 84));
 
         JPanel difficultyBox = createDifficultySection();
-        difficultyBox.setBorder(BorderFactory.createTitledBorder("Difficulty Modifiers"));
+        difficultyBox.setBorder(createThemedBorder("Difficulty Modifiers"));
+        difficultyBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 146));
 
         panel.add(passageBox);
-        panel.add(Box.createVerticalStrut(5));
+        panel.add(Box.createVerticalStrut(18));
         panel.add(seatBox);
-        panel.add(Box.createVerticalStrut(5));
+        panel.add(Box.createVerticalStrut(18));
         panel.add(difficultyBox);
-        panel.add(Box.createVerticalStrut(10));
-        panel.add(createStartButtonSection());
+        panel.add(Box.createVerticalStrut(34));
+        JPanel startButtonSection = createStartButtonSection();
+        startButtonSection.setMaximumSize(new Dimension(Integer.MAX_VALUE, 58));
+        panel.add(startButtonSection);
+        panel.add(Box.createVerticalGlue());
+        stylePanel(panel);
 
         return panel;
+    }
+
+    /**
+     * Applies the dark purple theme to a panel.
+     *
+     * @param panel the panel to style
+     */
+    private void stylePanel(JPanel panel)
+    {
+        panel.setBackground(BG_DARK);
+        panel.setForeground(TEXT_LIGHT);
+    }
+
+    /**
+     * Applies the slightly lifted panel colour used for grouped sections.
+     *
+     * @param panel the section panel to style
+     */
+    private void styleSectionPanel(JPanel panel)
+    {
+        panel.setBackground(PANEL_DARK);
+        panel.setForeground(TEXT_LIGHT);
+    }
+
+    /**
+     * Applies the dark purple theme to labels.
+     *
+     * @param label the label to style
+     */
+    private void styleLabel(JLabel label)
+    {
+        label.setForeground(TEXT_LIGHT);
+        if (label.getFont() != null && label.getFont().getSize() < 13)
+        {
+            label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
+        }
+    }
+
+    /**
+     * Applies the dark purple theme to buttons.
+     *
+     * @param button the button to style
+     */
+    private void styleButton(JButton button)
+    {
+        button.setBackground(PURPLE);
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setOpaque(false);
+        button.setContentAreaFilled(false);
+        button.setFont(new Font("Arial", Font.BOLD, 14));
+        button.setBorder(BorderFactory.createEmptyBorder(11, 26, 11, 26));
+        button.setUI(new RoundedButtonUI());
+    }
+
+    /**
+     * Applies the dark purple theme to text areas.
+     *
+     * @param textArea the text area to style
+     */
+    private void styleTextArea(JTextArea textArea)
+    {
+        textArea.setBackground(PANEL_DARK);
+        textArea.setForeground(TEXT_LIGHT);
+        textArea.setFont(new Font("Arial", Font.BOLD, 14));
+        textArea.setCaretColor(TEXT_LIGHT);
+        textArea.setSelectionColor(PURPLE_DARK);
+        textArea.setSelectedTextColor(Color.WHITE);
+        textArea.setDisabledTextColor(TEXT_MUTED);
+        textArea.setBorder(BorderFactory.createLineBorder(PURPLE_DARK));
+        textArea.setMargin(new Insets(10, 12, 10, 12));
+    }
+
+    /**
+     * Applies the dark purple theme to text panes.
+     *
+     * @param textPane the text pane to style
+     */
+    private void styleTextPane(JTextPane textPane)
+    {
+        textPane.setBackground(PANEL_DARK);
+        textPane.setForeground(TEXT_LIGHT);
+        textPane.setFont(new Font("Arial", Font.BOLD, 15));
+        textPane.setCaretColor(TEXT_LIGHT);
+        textPane.setSelectionColor(PURPLE_DARK);
+        textPane.setSelectedTextColor(Color.WHITE);
+        textPane.setBorder(BorderFactory.createLineBorder(PURPLE_DARK));
+        textPane.setMargin(new Insets(10, 12, 10, 12));
+    }
+
+    /**
+     * Applies the dark purple theme to combo boxes.
+     *
+     * @param comboBox the combo box to style
+     */
+    private void styleComboBox(JComboBox<?> comboBox)
+    {
+        comboBox.setBackground(PANEL_DARK);
+        comboBox.setForeground(TEXT_LIGHT);
+        comboBox.setFont(getUnicodeFriendlyFont(Font.BOLD, 13));
+        comboBox.setBorder(new RoundedLineBorder(PURPLE_DARK, 10));
+        comboBox.setFocusable(false);
+        comboBox.setPreferredSize(new Dimension(comboBox.getPreferredSize().width, 38));
+        comboBox.setUI(new ThemedComboBoxUI());
+    }
+
+    /**
+     * Returns a font suitable for rendering Unicode symbols.
+     * Falls back to a normal UI font if no symbol-capable font is available.
+     *
+     * @param style the font style
+     * @param size the font size
+     * @return a Font that can display the symbol glyphs
+     */
+    private Font getUnicodeFriendlyFont(int style, int size)
+    {
+        String[] candidates = {"Segoe UI Symbol", "Arial Unicode MS", "Segoe UI", "Arial"};
+        String glyphs = "■▲◆★●✕";
+
+        for (String candidate : candidates)
+        {
+            Font font = new Font(candidate, style, size);
+            if (font.canDisplayUpTo(glyphs) == -1)
+            {
+                return font;
+            }
+        }
+
+        return new Font("Arial", style, size);
+    }
+
+    /**
+     * Applies the dark purple theme to check boxes.
+     *
+     * @param checkBox the check box to style
+     */
+    private void styleCheckBox(JCheckBox checkBox)
+    {
+        checkBox.setBackground(PANEL_DARK);
+        checkBox.setForeground(TEXT_LIGHT);
+        checkBox.setFont(new Font("Arial", Font.BOLD, 13));
+        checkBox.setFocusPainted(false);
+        checkBox.setBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0));
+    }
+
+    /**
+     * Applies app-wide Swing colours so popups, tabs, and option panes match the theme.
+     */
+    private void configureThemeDefaults()
+    {
+        UIManager.put("Panel.background", BG_DARK);
+        UIManager.put("OptionPane.background", BG_DARK);
+        UIManager.put("OptionPane.messageForeground", TEXT_LIGHT);
+        UIManager.put("TabbedPane.background", BG_DARK);
+        UIManager.put("TabbedPane.foreground", TEXT_LIGHT);
+        UIManager.put("TabbedPane.selected", PANEL_DARK);
+        UIManager.put("ComboBox.background", PANEL_DARK);
+        UIManager.put("ComboBox.foreground", TEXT_LIGHT);
+        UIManager.put("TextArea.background", PANEL_DARK);
+        UIManager.put("TextArea.foreground", TEXT_LIGHT);
+        UIManager.put("TextPane.background", PANEL_DARK);
+        UIManager.put("TextPane.foreground", TEXT_LIGHT);
+        UIManager.put("Button.background", PURPLE);
+        UIManager.put("Button.foreground", Color.WHITE);
+    }
+
+    /**
+     * Applies the theme to tabbed panes.
+     *
+     * @param tabbedPane the tabbed pane to style
+     */
+    private void styleTabbedPane(JTabbedPane tabbedPane)
+    {
+        tabbedPane.setUI(new ThemedTabbedPaneUI());
+        tabbedPane.setBackground(BG_DARK);
+        tabbedPane.setForeground(TEXT_LIGHT);
+        tabbedPane.setOpaque(true);
+        tabbedPane.setFont(getUnicodeFriendlyFont(Font.BOLD, 12));
+        tabbedPane.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+    }
+
+    /**
+     * Creates a tab label for a typist, using a Unicode-friendly font and the selected colour.
+     *
+     * @param symbolGlyph the symbol glyph to show
+     * @param name the typist's name
+     * @param hexColour the colour hex value
+     * @return a label to use as the tab component
+     */
+    private JLabel createTypistTabLabel(String symbolGlyph, String name, String hexColour)
+    {
+        JLabel label = new JLabel(
+            "<html><span style=\"font-family:'Segoe UI Symbol'; color:" + hexColour + ";\">"
+            + symbolGlyph + "</span> <span style=\"color:#f5f5ff;\">" + name + "</span></html>"
+        );
+        label.setFont(getUnicodeFriendlyFont(Font.BOLD, 12));
+        label.setOpaque(false);
+        return label;
+    }
+
+    /**
+     * Applies the theme to scroll panes and their viewport.
+     *
+     * @param scrollPane the scroll pane to style
+     */
+    private void styleScrollPane(JScrollPane scrollPane)
+    {
+        scrollPane.setBackground(BG_DARK);
+        scrollPane.getViewport().setBackground(PANEL_DARK);
+        scrollPane.setBorder(BorderFactory.createLineBorder(PURPLE_DARK));
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        styleScrollBar(scrollPane.getVerticalScrollBar());
+        styleScrollBar(scrollPane.getHorizontalScrollBar());
+    }
+
+    /**
+     * Removes the border from scroll panes that sit inside already-bordered tab pages.
+     *
+     * @param scrollPane the scroll pane to style
+     */
+    private void styleBorderlessScrollPane(JScrollPane scrollPane)
+    {
+        styleScrollPane(scrollPane);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getViewport().setBackground(BG_DARK);
+    }
+
+    /**
+     * Applies the purple dark theme to scroll bars.
+     *
+     * @param scrollBar the scroll bar to style
+     */
+    private void styleScrollBar(JScrollBar scrollBar)
+    {
+        if (scrollBar == null)
+        {
+            return;
+        }
+
+        scrollBar.setUI(new ThemedScrollBarUI());
+        scrollBar.setBackground(BG_DARK);
+        scrollBar.setPreferredSize(new Dimension(12, 12));
+    }
+
+    /**
+     * Applies the theme to numeric spinners.
+     *
+     * @param spinner the spinner to style
+     */
+    private void styleSpinner(JSpinner spinner)
+    {
+        spinner.setBackground(PANEL_DARK);
+        spinner.setForeground(TEXT_LIGHT);
+        spinner.setBorder(new RoundedLineBorder(PURPLE_DARK, 10));
+        spinner.setPreferredSize(new Dimension(70, 34));
+
+        JComponent editor = spinner.getEditor();
+        if (editor instanceof JSpinner.DefaultEditor)
+        {
+            JTextField textField = ((JSpinner.DefaultEditor) editor).getTextField();
+            textField.setBackground(PANEL_DARK);
+            textField.setForeground(TEXT_LIGHT);
+            textField.setCaretColor(TEXT_LIGHT);
+            textField.setBorder(BorderFactory.createEmptyBorder(3, 5, 3, 5));
+        }
+
+        styleSpinnerButtons(spinner);
+    }
+
+    /**
+     * Finds and themes the arrow buttons inside a spinner.
+     *
+     * @param container the spinner or nested spinner component
+     */
+    private void styleSpinnerButtons(Container container)
+    {
+        for (Component component : container.getComponents())
+        {
+            if (component instanceof JButton)
+            {
+                JButton button = (JButton) component;
+                button.setBackground(PANEL_DARK);
+                button.setForeground(TEXT_MUTED);
+                button.setBorder(BorderFactory.createLineBorder(PURPLE_DARK));
+                button.setFocusPainted(false);
+            }
+
+            if (component instanceof Container)
+            {
+                styleSpinnerButtons((Container) component);
+            }
+        }
+    }
+
+    /**
+     * Themes common Swing components inside a container.
+     *
+     * @param container the container whose children should be styled
+     */
+    private void styleComponentTree(Container container)
+    {
+        for (Component component : container.getComponents())
+        {
+            if (component instanceof JLabel)
+            {
+                styleLabel((JLabel) component);
+            }
+            else if (component instanceof JButton)
+            {
+                styleButton((JButton) component);
+            }
+            else if (component instanceof JCheckBox)
+            {
+                styleCheckBox((JCheckBox) component);
+            }
+            else if (component instanceof JComboBox)
+            {
+                styleComboBox((JComboBox<?>) component);
+            }
+            else if (component instanceof JTextArea)
+            {
+                styleTextArea((JTextArea) component);
+            }
+            else if (component instanceof JTextPane)
+            {
+                styleTextPane((JTextPane) component);
+            }
+            else if (component instanceof JScrollPane)
+            {
+                styleScrollPane((JScrollPane) component);
+            }
+            else if (component instanceof JTabbedPane)
+            {
+                styleTabbedPane((JTabbedPane) component);
+            }
+            else if (component instanceof JSpinner)
+            {
+                styleSpinner((JSpinner) component);
+            }
+            else if (component instanceof JPanel)
+            {
+                stylePanel((JPanel) component);
+            }
+
+            if (component instanceof Container)
+            {
+                styleComponentTree((Container) component);
+            }
+        }
+    }
+
+    /**
+     * Creates a purple titled border for grouped GUI sections.
+     *
+     * @param title the title shown on the border
+     * @return the styled titled border
+     */
+    private javax.swing.border.Border createThemedBorder(String title)
+    {
+        javax.swing.border.TitledBorder border = BorderFactory.createTitledBorder(
+            new RoundedLineBorder(PURPLE, 12),
+            title
+        );
+
+        border.setTitleColor(TEXT_LIGHT);
+        border.setTitleFont(getUnicodeFriendlyFont(Font.BOLD, 13));
+        return BorderFactory.createCompoundBorder(
+            border,
+            BorderFactory.createEmptyBorder(18, 18, 18, 18)
+        );
+    }
+
+    /**
+     * Rounded border used by inputs and grouped panels.
+     */
+    private class RoundedLineBorder extends AbstractBorder
+    {
+        private Color colour;
+        private int arc;
+
+        public RoundedLineBorder(Color colour, int arc)
+        {
+            this.colour = colour;
+            this.arc = arc;
+        }
+
+        public void paintBorder(Component component, Graphics graphics, int x, int y, int width, int height)
+        {
+            Graphics2D graphics2D = (Graphics2D) graphics.create();
+            graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics2D.setColor(colour);
+            graphics2D.drawRoundRect(x, y, width - 1, height - 1, arc, arc);
+            graphics2D.dispose();
+        }
+
+        public Insets getBorderInsets(Component component)
+        {
+            return new Insets(4, 8, 4, 8);
+        }
+
+        public Insets getBorderInsets(Component component, Insets insets)
+        {
+            insets.left = 8;
+            insets.right = 8;
+            insets.top = 4;
+            insets.bottom = 4;
+            return insets;
+        }
+    }
+
+    /**
+     * Paints buttons as rounded purple controls.
+     */
+    private class RoundedButtonUI extends BasicButtonUI
+    {
+        public void paint(Graphics graphics, JComponent component)
+        {
+            AbstractButton button = (AbstractButton) component;
+            Graphics2D graphics2D = (Graphics2D) graphics.create();
+            graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color fill = button.isEnabled() ? PURPLE : PURPLE_DARK;
+            if (button.getModel().isRollover())
+            {
+                fill = new Color(157, 111, 255);
+            }
+
+            graphics2D.setColor(fill);
+            graphics2D.fillRoundRect(0, 0, component.getWidth(), component.getHeight(), 14, 14);
+            graphics2D.dispose();
+
+            super.paint(graphics, component);
+        }
+
+        protected void paintText(Graphics graphics, AbstractButton button, Rectangle textRectangle, String text)
+        {
+            FontMetrics metrics = graphics.getFontMetrics();
+
+            graphics.setColor(button.isEnabled() ? button.getForeground() : TEXT_MUTED);
+            graphics.drawString(
+                text,
+                textRectangle.x,
+                textRectangle.y + metrics.getAscent()
+            );
+        }
+    }
+
+    /**
+     * Keeps combo box arrow buttons inside the dark theme.
+     */
+    private class ThemedComboBoxUI extends BasicComboBoxUI
+    {
+        protected JButton createArrowButton()
+        {
+            JButton button = new JButton("▼");
+            button.setFont(new Font("Arial", Font.BOLD, 9));
+            button.setForeground(TEXT_MUTED);
+            button.setBackground(PANEL_DARK);
+            button.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, PURPLE_DARK));
+            button.setFocusPainted(false);
+            button.setContentAreaFilled(false);
+            return button;
+        }
+    }
+
+    /**
+     * Paints scrollbars so scrollable tab content stays in the dark theme.
+     */
+    private class ThemedScrollBarUI extends BasicScrollBarUI
+    {
+        protected void configureScrollBarColors()
+        {
+            thumbColor = PURPLE;
+            trackColor = BG_DARK;
+        }
+
+        protected JButton createDecreaseButton(int orientation)
+        {
+            return createScrollButton();
+        }
+
+        protected JButton createIncreaseButton(int orientation)
+        {
+            return createScrollButton();
+        }
+
+        private JButton createScrollButton()
+        {
+            JButton button = new JButton();
+            button.setPreferredSize(new Dimension(0, 0));
+            button.setMinimumSize(new Dimension(0, 0));
+            button.setMaximumSize(new Dimension(0, 0));
+            return button;
+        }
+
+        protected void paintTrack(Graphics graphics, JComponent component, Rectangle trackBounds)
+        {
+            graphics.setColor(BG_DARK);
+            graphics.fillRect(trackBounds.x, trackBounds.y, trackBounds.width, trackBounds.height);
+        }
+
+        protected void paintThumb(Graphics graphics, JComponent component, Rectangle thumbBounds)
+        {
+            if (thumbBounds.isEmpty() || !scrollbar.isEnabled())
+            {
+                return;
+            }
+
+            Graphics2D graphics2D = (Graphics2D) graphics.create();
+            graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics2D.setColor(PURPLE);
+            graphics2D.fillRoundRect(
+                thumbBounds.x + 2,
+                thumbBounds.y + 2,
+                thumbBounds.width - 4,
+                thumbBounds.height - 4,
+                10,
+                10
+            );
+            graphics2D.dispose();
+        }
+    }
+
+    /**
+     * Removes the default Metal tab bars and paints compact dark tabs.
+     */
+    private class ThemedTabbedPaneUI extends BasicTabbedPaneUI
+    {
+        protected void installDefaults()
+        {
+            super.installDefaults();
+            tabInsets = new Insets(7, 18, 7, 18);
+            selectedTabPadInsets = new Insets(0, 0, 0, 0);
+            contentBorderInsets = new Insets(0, 0, 0, 0);
+        }
+
+        protected int calculateTabWidth(int tabPlacement, int tabIndex, FontMetrics metrics)
+        {
+            return super.calculateTabWidth(tabPlacement, tabIndex, metrics) + 8;
+        }
+
+        protected void paintTabBackground(
+            Graphics graphics,
+            int tabPlacement,
+            int tabIndex,
+            int x,
+            int y,
+            int width,
+            int height,
+            boolean isSelected)
+        {
+            Graphics2D graphics2D = (Graphics2D) graphics.create();
+            graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics2D.setColor(isSelected ? PANEL_DARK : BG_DARK);
+            graphics2D.fillRoundRect(x + 4, y + 2, width - 8, height - 2, 10, 10);
+            graphics2D.dispose();
+        }
+
+        protected void paintTabBorder(
+            Graphics graphics,
+            int tabPlacement,
+            int tabIndex,
+            int x,
+            int y,
+            int width,
+            int height,
+            boolean isSelected)
+        {
+            Graphics2D graphics2D = (Graphics2D) graphics.create();
+            graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics2D.setColor(isSelected ? PURPLE : PURPLE_DARK);
+            graphics2D.drawRoundRect(x + 4, y + 2, width - 9, height - 3, 10, 10);
+            graphics2D.dispose();
+        }
+
+        protected void paintContentBorder(Graphics graphics, int tabPlacement, int selectedIndex)
+        {
+        }
+
+        protected void paintFocusIndicator(
+            Graphics graphics,
+            int tabPlacement,
+            Rectangle[] rectangles,
+            int tabIndex,
+            Rectangle iconRect,
+            Rectangle textRect,
+            boolean isSelected)
+        {
+        }
+    }
+
+    /**
+     * Panel used inside scroll panes so content follows the viewport width.
+     */
+    private class ScrollableContentPanel extends JPanel implements Scrollable
+    {
+        public Dimension getPreferredScrollableViewportSize()
+        {
+            return getPreferredSize();
+        }
+
+        public int getScrollableUnitIncrement(Rectangle visibleRectangle, int orientation, int direction)
+        {
+            return 18;
+        }
+
+        public int getScrollableBlockIncrement(Rectangle visibleRectangle, int orientation, int direction)
+        {
+            return 90;
+        }
+
+        public boolean getScrollableTracksViewportWidth()
+        {
+            return true;
+        }
+
+        public boolean getScrollableTracksViewportHeight()
+        {
+            return false;
+        }
     }
 
     /**
@@ -168,8 +834,7 @@ public class TypingRaceGUI
      */
     private JPanel createPassageSection()
     {
-        JPanel panel = new JPanel(new BorderLayout(5, 5));
-        panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
 
         String[] passages = {
             "Short: The quick brown fox jumps over the lazy dog.",
@@ -186,10 +851,10 @@ public class TypingRaceGUI
         customPassageArea.setWrapStyleWord(true);
 
         JScrollPane scrollPane = new JScrollPane(customPassageArea);
-        scrollPane.setPreferredSize(new Dimension(0, 80));
+        scrollPane.setPreferredSize(new Dimension(0, 92));
 
         passageLengthLabel = new JLabel("Passage length: 44 characters");
-        passageLengthLabel.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
+        passageLengthLabel.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
 
         passageComboBox.addActionListener(e -> updateSelectedPassage());
 
@@ -200,11 +865,38 @@ public class TypingRaceGUI
             }
         });
 
+        customPassageArea.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusGained(java.awt.event.FocusEvent e)
+            {
+                if ("Custom Passage".equals(passageComboBox.getSelectedItem()))
+                {
+                    clearCustomPassagePlaceholder();
+                }
+            }
+
+            public void focusLost(java.awt.event.FocusEvent e)
+            {
+                if ("Custom Passage".equals(passageComboBox.getSelectedItem()) &&
+                    customPassageArea.getText().trim().isEmpty())
+                {
+                    showCustomPassagePlaceholder();
+                }
+
+                updateSelectedPassage();
+            }
+        });
+
         panel.add(passageComboBox, BorderLayout.NORTH);
         panel.add(scrollPane, BorderLayout.CENTER);
         panel.add(passageLengthLabel, BorderLayout.SOUTH);
 
         updateSelectedPassage();
+        styleSectionPanel(panel);
+        styleLabel(passageLengthLabel);
+        styleComboBox(passageComboBox);
+        styleTextArea(customPassageArea);
+        styleScrollPane(scrollPane);
+        showCustomPassagePlaceholder();
 
         return panel;
     }
@@ -216,13 +908,13 @@ public class TypingRaceGUI
      */
     private JPanel createSeatCountSection()
     {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 6));
 
         JLabel label = new JLabel("Number of racers:");
 
         SpinnerNumberModel spinnerModel = new SpinnerNumberModel(2, 2, 6, 1);
         seatCountSpinner = new JSpinner(spinnerModel);
-        seatCountSpinner.setPreferredSize(new Dimension(60, 28));
+        seatCountSpinner.setPreferredSize(new Dimension(70, 34));
 
         JSpinner.DefaultEditor editor = (JSpinner.DefaultEditor) seatCountSpinner.getEditor();
         editor.getTextField().setEditable(false);
@@ -233,6 +925,9 @@ public class TypingRaceGUI
         panel.add(label);
         panel.add(seatCountSpinner);
 
+        styleSectionPanel(panel);
+        styleLabel(label);
+        styleSpinner(seatCountSpinner);
         return panel;
     }
 
@@ -243,8 +938,7 @@ public class TypingRaceGUI
      */
     private JPanel createDifficultySection()
     {
-        JPanel panel = new JPanel(new GridLayout(3, 1, 5, 4));
-        panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        JPanel panel = new JPanel(new GridLayout(3, 1, 6, 6));
 
         autocorrectCheckBox = new JCheckBox("Autocorrect On - slide back amount is reduced");
         caffeineModeCheckBox = new JCheckBox("Caffeine Mode - early speed boost, higher burnout risk");
@@ -254,6 +948,10 @@ public class TypingRaceGUI
         panel.add(caffeineModeCheckBox);
         panel.add(nightShiftCheckBox);
 
+        styleSectionPanel(panel);
+        styleCheckBox(autocorrectCheckBox);
+        styleCheckBox(caffeineModeCheckBox);
+        styleCheckBox(nightShiftCheckBox);
         return panel;
     }
 
@@ -268,8 +966,11 @@ public class TypingRaceGUI
 
         startRaceButton = new JButton("Start Race");
         startRaceButton.addActionListener(e -> showRaceScreen());
-
+        
         panel.add(startRaceButton);
+        styleButton(startRaceButton);
+
+        stylePanel(panel);
 
         return panel;
     }
@@ -304,26 +1005,37 @@ public class TypingRaceGUI
             startingAccuracies[i] = currentTypists[i].getAccuracy();
         }
 
-        JPanel racePanel = new JPanel(new BorderLayout(10, 10));
-        racePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel racePanel = new JPanel(new BorderLayout(12, 18));
+        racePanel.setBorder(BorderFactory.createEmptyBorder(22, 24, 22, 34));
 
-        JLabel titleLabel = new JLabel("Typing Race", JLabel.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        JLabel titleLabel = new JLabel("< Typing Race Simulator />", JLabel.CENTER);
+        titleLabel.setFont(new Font("Consolas", Font.BOLD, 30));
+        titleLabel.setForeground(PURPLE);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 
-        JPanel lanesPanel = new JPanel(new GridLayout(currentTypists.length, 1, 5, 5));
+        JPanel lanesPanel = new ScrollableContentPanel();
+        lanesPanel.setLayout(new BoxLayout(lanesPanel, BoxLayout.Y_AXIS));
+        lanesPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 18));
+        stylePanel(lanesPanel);
 
         for (int i = 0; i < currentTypists.length; i++)
         {
             lanesPanel.add(createRaceLanePanel(currentTypists[i], i));
+            lanesPanel.add(Box.createVerticalStrut(14));
         }
 
+        JScrollPane lanesScrollPane = new JScrollPane(lanesPanel);
+        lanesScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        styleBorderlessScrollPane(lanesScrollPane);
+
         racePanel.add(titleLabel, BorderLayout.NORTH);
-        racePanel.add(lanesPanel, BorderLayout.CENTER);
+        racePanel.add(lanesScrollPane, BorderLayout.CENTER);
         racePanel.add(createRaceButtonPanel(), BorderLayout.SOUTH);
 
         frame.setContentPane(racePanel);
         frame.revalidate();
         frame.repaint();
+        stylePanel(racePanel);
 
         startRaceAnimation();
     }
@@ -335,7 +1047,10 @@ public class TypingRaceGUI
      */
     private JPanel createRaceButtonPanel()
     {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel panel = new JPanel(new BorderLayout(14, 0));
+
+        raceWinnerLabel = new JLabel("Race in progress...");
+        raceWinnerLabel.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 0));
 
         viewStatsButton = new JButton("View Stats");
         viewStatsButton.setEnabled(false);
@@ -344,8 +1059,17 @@ public class TypingRaceGUI
         JButton backButton = new JButton("Back to Menu");
         backButton.addActionListener(e -> showSetupScreen());
 
-        panel.add(viewStatsButton);
-        panel.add(backButton);
+        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 5));
+        buttonsPanel.add(viewStatsButton);
+        buttonsPanel.add(backButton);
+
+        panel.add(raceWinnerLabel, BorderLayout.CENTER);
+        panel.add(buttonsPanel, BorderLayout.EAST);
+        stylePanel(panel);
+        stylePanel(buttonsPanel);
+        styleLabel(raceWinnerLabel);
+        styleButton(viewStatsButton);
+        styleButton(backButton);
 
         return panel;
     }
@@ -374,22 +1098,44 @@ public class TypingRaceGUI
      */
     private JPanel createRaceLanePanel(Typist typist, int index)
     {
-        JPanel lanePanel = new JPanel(new BorderLayout(10, 10));
+        JPanel lanePanel = new JPanel(new BorderLayout(12, 12));
         String hex = toHex(getSelectedColourSafe(index));
+        Dimension laneSize = new Dimension(0, 165);
 
-        lanePanel.setBorder(BorderFactory.createTitledBorder(
-            "<html><font color='" + hex + "'>" + typist.getSymbol() + "</font> " + typist.getName() + "</html>"
+        lanePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lanePanel.setPreferredSize(laneSize);
+        lanePanel.setMinimumSize(new Dimension(0, 150));
+        lanePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 165));
+
+        javax.swing.border.TitledBorder laneBorder = BorderFactory.createTitledBorder(
+            new RoundedLineBorder(PURPLE, 12),
+            typist.getSymbol() + " " + typist.getName()
+        );
+        laneBorder.setTitleColor(getSelectedColourSafe(index));
+        laneBorder.setTitleFont(getUnicodeFriendlyFont(Font.BOLD, 13));
+        lanePanel.setBorder(BorderFactory.createCompoundBorder(
+            laneBorder,
+            BorderFactory.createEmptyBorder(18, 18, 18, 18)
         ));
 
         JTextPane passagePane = new JTextPane();
         passagePane.setEditable(false);
         passagePane.setText(selectedPassage);
+        passagePane.setFont(new Font("Arial", Font.BOLD, 15));
+        passagePane.setPreferredSize(new Dimension(0, 76));
         raceTextPanes[index] = passagePane;
 
         raceStatusLabels[index] = new JLabel("Ready");
+        raceStatusLabels[index].setBorder(BorderFactory.createEmptyBorder(2, 2, 0, 2));
 
-        lanePanel.add(new JScrollPane(passagePane), BorderLayout.CENTER);
+        JScrollPane scrollPane = new JScrollPane(passagePane);
+
+        lanePanel.add(scrollPane, BorderLayout.CENTER);
         lanePanel.add(raceStatusLabels[index], BorderLayout.SOUTH);
+        styleSectionPanel(lanePanel);
+        styleTextPane(passagePane);
+        styleLabel(raceStatusLabels[index]);
+        styleScrollPane(scrollPane);
 
         return lanePanel;
     }
@@ -503,12 +1249,12 @@ public class TypingRaceGUI
             viewStatsButton.setEnabled(true);
         }
 
-        JOptionPane.showMessageDialog(frame,
-            "And the winner is... " + winner.getName() + "!\n"
-            + "Final accuracy: " + String.format("%.2f", winner.getAccuracy())
-            + " (improved from " + String.format("%.2f", oldAccuracy) + ")",
-            "Race Finished",
-            JOptionPane.INFORMATION_MESSAGE);
+        if (raceWinnerLabel != null)
+        {
+            raceWinnerLabel.setText("<html>Winner: " + winner.getName()
+                + "<br>Accuracy: " + String.format("%.2f", oldAccuracy)
+                + " -> " + String.format("%.2f", winner.getAccuracy()) + "</html>");
+        }
     }
 
     /**
@@ -544,7 +1290,7 @@ public class TypingRaceGUI
             StyleConstants.setBold(currentStyle, true);
 
             SimpleAttributeSet remainingStyle = new SimpleAttributeSet();
-            StyleConstants.setForeground(remainingStyle, Color.BLACK);
+            StyleConstants.setForeground(remainingStyle, TEXT_LIGHT);
 
             doc.insertString(doc.getLength(), selectedPassage.substring(0, progress), typedStyle);
 
@@ -606,11 +1352,16 @@ public class TypingRaceGUI
     }
 
     /**
-     * Displays race statistics for all typists.
+     * Displays statistics for the current race only.
      */
     private void showStatsWindow()
     {
-        JOptionPane.showMessageDialog(frame, lastRaceStats, "Stats", JOptionPane.INFORMATION_MESSAGE);
+        JFrame statsFrame = new JFrame("Race Statistics");
+        statsFrame.setSize(820, 560);
+        statsFrame.setLocationRelativeTo(frame);
+        statsFrame.getContentPane().setBackground(BG_DARK);
+        statsFrame.add(createStatsTextPanel(lastRaceStats));
+        statsFrame.setVisible(true);
     }
 
     /**
@@ -715,8 +1466,8 @@ public class TypingRaceGUI
      */
     private JPanel createStatsPanel()
     {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel panel = new JPanel(new BorderLayout(12, 12));
+        panel.setBorder(BorderFactory.createEmptyBorder(22, 24, 22, 24));
 
         JTabbedPane statsTabs = new JTabbedPane();
 
@@ -727,6 +1478,8 @@ public class TypingRaceGUI
         statsTabs.addTab("Charts", createStatsTextPanel("Graphical display will be added here."));
 
         panel.add(statsTabs, BorderLayout.CENTER);
+        stylePanel(panel);
+        styleTabbedPane(statsTabs);
 
         return panel;
     }
@@ -760,14 +1513,19 @@ public class TypingRaceGUI
     private JPanel createStatsTextPanel(String text)
     {
         JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
         JTextArea textArea = new JTextArea(text);
         textArea.setEditable(false);
         textArea.setLineWrap(true);
         textArea.setWrapStyleWord(true);
 
-        panel.add(new JScrollPane(textArea), BorderLayout.CENTER);
+        JScrollPane scrollPane = new JScrollPane(textArea);
 
+        panel.add(scrollPane, BorderLayout.CENTER);
+        stylePanel(panel);
+        styleTextArea(textArea);
+        styleScrollPane(scrollPane);
         return panel;
     }
 
@@ -778,10 +1536,10 @@ public class TypingRaceGUI
      */
     private JPanel createComparisonPanel()
     {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel panel = new JPanel(new BorderLayout(14, 14));
+        panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
-        JPanel selectionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel selectionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 8));
 
         JComboBox<String> firstTypistBox = new JComboBox<>(typistNames);
         JComboBox<String> secondTypistBox = new JComboBox<>(typistNames);
@@ -809,9 +1567,12 @@ public class TypingRaceGUI
             comparisonArea.setText(buildComparisonText(firstIndex, secondIndex));
         });
 
-        selectionPanel.add(new JLabel("Typist 1:"));
+        JLabel firstLabel = new JLabel("Typist 1:");
+        JLabel secondLabel = new JLabel("Typist 2:");
+
+        selectionPanel.add(firstLabel);
         selectionPanel.add(firstTypistBox);
-        selectionPanel.add(new JLabel("Typist 2:"));
+        selectionPanel.add(secondLabel);
         selectionPanel.add(secondTypistBox);
         selectionPanel.add(compareButton);
 
@@ -828,7 +1589,18 @@ public class TypingRaceGUI
         comparisonArea.setText(buildComparisonText(0, 1));
 
         panel.add(selectionPanel, BorderLayout.NORTH);
-        panel.add(new JScrollPane(comparisonArea), BorderLayout.CENTER);
+        JScrollPane scrollPane = new JScrollPane(comparisonArea);
+
+        panel.add(scrollPane, BorderLayout.CENTER);
+        stylePanel(panel);
+        stylePanel(selectionPanel);
+        styleLabel(firstLabel);
+        styleLabel(secondLabel);
+        styleComboBox(firstTypistBox);
+        styleComboBox(secondTypistBox);
+        styleTextArea(comparisonArea);
+        styleScrollPane(scrollPane);
+        styleButton(compareButton);
 
         return panel;
     }
@@ -871,29 +1643,7 @@ public class TypingRaceGUI
     private Color getSelectedColour(int index)
     {
         String colour = (String) colourBoxes[index].getSelectedItem();
-
-        if ("Red".equals(colour))
-        {
-            return Color.RED;
-        }
-        else if ("Blue".equals(colour))
-        {
-            return Color.BLUE;
-        }
-        else if ("Green".equals(colour))
-        {
-            return new Color(0, 128, 0);
-        }
-        else if ("Purple".equals(colour))
-        {
-            return new Color(128, 0, 128);
-        }
-        else if ("Orange".equals(colour))
-        {
-            return Color.ORANGE;
-        }
-
-        return Color.BLACK;
+        return getColourFromName(colour);
     }
 
     /**
@@ -914,6 +1664,46 @@ public class TypingRaceGUI
     }
 
     /**
+     * Converts a colour name into a Color object.
+     *
+     * @param colour the colour name
+     * @return the matching Color object
+     */
+    private Color getColourFromName(String colour)
+    {
+        if ("Cyan".equals(colour))
+        {
+            return new Color(0, 200, 255);
+        }
+        else if ("Green".equals(colour))
+        {
+            return new Color(0, 255, 100);
+        }
+        else if ("Pink".equals(colour))
+        {
+            return new Color(255, 50, 150);
+        }
+        else if ("Purple".equals(colour))
+        {
+            return new Color(170, 70, 255);
+        }
+        else if ("Orange".equals(colour))
+        {
+            return new Color(255, 120, 0);
+        }
+        else if ("Red".equals(colour))
+        {
+            return new Color(255, 50, 50);
+        }
+        else if ("Yellow".equals(colour))
+        {
+            return new Color(255, 255, 0);
+        }
+
+        return Color.BLACK;
+    }
+
+    /**
      * Converts a Color object into a hex colour string for HTML text.
      *
      * @param color the colour to convert
@@ -928,6 +1718,28 @@ public class TypingRaceGUI
     }
 
     /**
+     * Gets only the display glyph from a symbol dropdown option.
+     *
+     * @param symbolOption the full symbol option text
+     * @return the symbol glyph
+     */
+    private String getSymbolGlyph(String symbolOption)
+    {
+        if (symbolOption == null || symbolOption.isEmpty())
+        {
+            return "";
+        }
+
+        int spaceIndex = symbolOption.indexOf(" ");
+        if (spaceIndex > 0)
+        {
+            return symbolOption.substring(0, spaceIndex);
+        }
+
+        return symbolOption.substring(0, 1);
+    }
+
+    /**
      * Creates the customisation panel for typist options.
      * Each typist has their own tab.
      *
@@ -935,13 +1747,15 @@ public class TypingRaceGUI
      */
     private JPanel createCustomiseTypistsPanel()
     {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel panel = new JPanel(new BorderLayout(12, 12));
+        panel.setBorder(BorderFactory.createEmptyBorder(22, 24, 22, 24));
 
         typistTabbedPane = new JTabbedPane();
         panel.add(typistTabbedPane, BorderLayout.CENTER);
 
         updateTypistTabs();
+        stylePanel(panel);
+        styleTabbedPane(typistTabbedPane);
 
         return panel;
     }
@@ -973,17 +1787,37 @@ public class TypingRaceGUI
         for (int i = 0; i < count; i++)
         {
             String hex = toHex(getSelectedColourSafe(i));
+            String symbolGlyph = getSymbolGlyph(availableSymbols[i]);
 
             typistTabbedPane.addTab(
-                "<html><font color='" + hex + "'>" + availableSymbols[i] + "</font> " + typistNames[i] + "</html>",
-                createSingleTypistPanel(i)
+                typistNames[i],
+                createTypistScrollPane(i)
+            );
+            typistTabbedPane.setTabComponentAt(i,
+                createTypistTabLabel(symbolGlyph, typistNames[i], hex)
             );
         }
 
         updateSymbolAvailability();
+        updateColourAvailability();
 
         typistTabbedPane.revalidate();
         typistTabbedPane.repaint();
+    }
+
+    /**
+     * Creates a scrollable customisation page for one typist.
+     *
+     * @param index the index of the typist
+     * @return the scrollable typist customisation page
+     */
+    private JScrollPane createTypistScrollPane(int index)
+    {
+        JScrollPane scrollPane = new JScrollPane(createSingleTypistPanel(index));
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(18);
+        styleBorderlessScrollPane(scrollPane);
+        return scrollPane;
     }
 
     /**
@@ -994,13 +1828,29 @@ public class TypingRaceGUI
      */
     private JPanel createSingleTypistPanel(int index)
     {
-        JPanel panel = new JPanel(new GridLayout(4, 1, 10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel panel = new ScrollableContentPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(22, 22, 22, 22));
 
-        panel.add(createTypingStylePanel(index));
-        panel.add(createKeyboardTypePanel(index));
-        panel.add(createSymbolColourPanel(index));
-        panel.add(createAccessoriesPanel(index));
+        JPanel typingStylePanel = createTypingStylePanel(index);
+        JPanel keyboardTypePanel = createKeyboardTypePanel(index);
+        JPanel symbolColourPanel = createSymbolColourPanel(index);
+        JPanel accessoriesPanel = createAccessoriesPanel(index);
+
+        typingStylePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 126));
+        keyboardTypePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 126));
+        symbolColourPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 138));
+        accessoriesPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 158));
+
+        panel.add(typingStylePanel);
+        panel.add(Box.createVerticalStrut(18));
+        panel.add(keyboardTypePanel);
+        panel.add(Box.createVerticalStrut(18));
+        panel.add(symbolColourPanel);
+        panel.add(Box.createVerticalStrut(18));
+        panel.add(accessoriesPanel);
+        panel.add(Box.createVerticalGlue());
+        stylePanel(panel);
 
         return panel;
     }
@@ -1013,8 +1863,8 @@ public class TypingRaceGUI
      */
     private JPanel createTypingStylePanel(int index)
     {
-        JPanel panel = new JPanel(new GridLayout(3, 1, 5, 5));
-        panel.setBorder(BorderFactory.createTitledBorder("Typing Style"));
+        JPanel panel = new JPanel(new GridLayout(3, 1, 8, 8));
+        panel.setBorder(createThemedBorder("Typing Style"));
 
         String[] typingStyles = {
             "Touch Typist",
@@ -1024,13 +1874,18 @@ public class TypingRaceGUI
         };
 
         typingStyleBoxes[index] = new JComboBox<>(typingStyles);
+        JLabel chooseLabel = new JLabel("Choose typing style:");
         JLabel impactLabel = new JLabel("Impact: Balanced accuracy and speed.");
 
         typingStyleBoxes[index].addActionListener(e -> updateTypistImpact(index));
 
-        panel.add(new JLabel("Choose typing style:"));
+        panel.add(chooseLabel);
         panel.add(typingStyleBoxes[index]);
         panel.add(impactLabel);
+        styleSectionPanel(panel);
+        styleLabel(chooseLabel);
+        styleLabel(impactLabel);
+        styleComboBox(typingStyleBoxes[index]);
 
         return panel;
     }
@@ -1043,8 +1898,8 @@ public class TypingRaceGUI
      */
     private JPanel createKeyboardTypePanel(int index)
     {
-        JPanel panel = new JPanel(new GridLayout(3, 1, 5, 5));
-        panel.setBorder(BorderFactory.createTitledBorder("Keyboard Type"));
+        JPanel panel = new JPanel(new GridLayout(3, 1, 8, 8));
+        panel.setBorder(createThemedBorder("Keyboard Type"));
 
         String[] keyboardTypes = {
             "Mechanical",
@@ -1054,13 +1909,18 @@ public class TypingRaceGUI
         };
 
         keyboardTypeBoxes[index] = new JComboBox<>(keyboardTypes);
+        JLabel chooseLabel = new JLabel("Choose keyboard type:");
         JLabel impactLabel = new JLabel("Impact: Steady typing performance.");
 
         keyboardTypeBoxes[index].addActionListener(e -> updateTypistImpact(index));
 
-        panel.add(new JLabel("Choose keyboard type:"));
+        panel.add(chooseLabel);
         panel.add(keyboardTypeBoxes[index]);
         panel.add(impactLabel);
+        styleSectionPanel(panel);
+        styleLabel(chooseLabel);
+        styleLabel(impactLabel);
+        styleComboBox(keyboardTypeBoxes[index]);
 
         return panel;
     }
@@ -1073,31 +1933,223 @@ public class TypingRaceGUI
      */
     private JPanel createSymbolColourPanel(int index)
     {
-        JPanel panel = new JPanel(new GridLayout(2, 2, 5, 5));
-        panel.setBorder(BorderFactory.createTitledBorder("Symbol and Colour"));
-
-        String[] colours = {
-            "Red",
-            "Blue",
-            "Green",
-            "Purple",
-            "Orange",
-            "Black"
-        };
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(createThemedBorder("Symbol and Colour"));
 
         symbolBoxes[index] = new JComboBox<>(availableSymbols);
         symbolBoxes[index].setSelectedItem(availableSymbols[index]);
+        symbolBoxes[index].setRenderer(new SymbolComboBoxRenderer(index));
+        symbolBoxes[index].setForeground(getSelectedColourSafe(index));
         symbolBoxes[index].addActionListener(e -> updateSymbolAvailability());
 
-        colourBoxes[index] = new JComboBox<>(colours);
-        colourBoxes[index].addActionListener(e -> updateSymbolAvailability());
+        colourBoxes[index] = new JComboBox<>(availableColours);
+        colourBoxes[index].setSelectedItem(availableColours[index]);
+        colourBoxes[index].setRenderer(new ColourComboBoxRenderer());
+        colourBoxes[index].setForeground(getSelectedColourSafe(index));
+        colourBoxes[index].addActionListener(e -> updateColourAvailability());
 
-        panel.add(new JLabel("Typist symbol:"));
-        panel.add(symbolBoxes[index]);
-        panel.add(new JLabel("Progress colour:"));
-        panel.add(colourBoxes[index]);
+        JLabel symbolLabel = new JLabel("Typist symbol:");
+        JLabel colourLabel = new JLabel("Progress colour:");
+
+        GridBagConstraints constraints = new GridBagConstraints();
+        constraints.insets = new Insets(4, 0, 8, 14);
+        constraints.anchor = GridBagConstraints.WEST;
+        constraints.gridx = 0;
+        constraints.gridy = 0;
+        panel.add(symbolLabel, constraints);
+
+        constraints.gridx = 1;
+        constraints.weightx = 1.0;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.insets = new Insets(4, 0, 8, 0);
+        panel.add(symbolBoxes[index], constraints);
+
+        constraints.gridx = 0;
+        constraints.gridy = 1;
+        constraints.weightx = 0.0;
+        constraints.fill = GridBagConstraints.NONE;
+        constraints.insets = new Insets(4, 0, 4, 14);
+        panel.add(colourLabel, constraints);
+
+        constraints.gridx = 1;
+        constraints.weightx = 1.0;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.insets = new Insets(4, 0, 4, 0);
+        panel.add(colourBoxes[index], constraints);
+        styleSectionPanel(panel);
+        styleLabel(symbolLabel);
+        styleLabel(colourLabel);
+        styleComboBox(symbolBoxes[index]);
+        styleComboBox(colourBoxes[index]);
 
         return panel;
+    }
+
+    /**
+     * Updates all colour dropdowns so a colour already used by one typist
+     * cannot be selected by another typist.
+     */
+    private void updateColourAvailability()
+    {
+        if (updatingSymbols || colourBoxes == null)
+        {
+            return;
+        }
+
+        updatingSymbols = true;
+
+        int count = (Integer) seatCountSpinner.getValue();
+        String[] selectedColours = new String[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            if (colourBoxes[i] != null)
+            {
+                selectedColours[i] = (String) colourBoxes[i].getSelectedItem();
+            }
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            if (colourBoxes[i] != null)
+            {
+                String currentColour = selectedColours[i];
+
+                colourBoxes[i].removeAllItems();
+
+                for (String colour : availableColours)
+                {
+                    if (colour.equals(currentColour) || !colourIsUsedByAnotherTypist(colour, selectedColours, i))
+                    {
+                        colourBoxes[i].addItem(colour);
+                    }
+                }
+
+                colourBoxes[i].setSelectedItem(currentColour);
+                colourBoxes[i].setRenderer(new ColourComboBoxRenderer());
+                colourBoxes[i].setForeground(getSelectedColourSafe(i));
+                symbolBoxes[i].setRenderer(new SymbolComboBoxRenderer(i));
+                symbolBoxes[i].setForeground(getSelectedColourSafe(i));
+
+                String currentSymbol = (String) symbolBoxes[i].getSelectedItem();
+                String hex = toHex(getSelectedColourSafe(i));
+
+                typistTabbedPane.setTabComponentAt(i,
+                    createTypistTabLabel(getSymbolGlyph(currentSymbol), typistNames[i], hex)
+                );
+            }
+        }
+
+        updatingSymbols = false;
+    }
+
+    /**
+     * Checks whether a colour is already selected by another typist.
+     *
+     * @param colour the colour to check
+     * @param selectedColours the currently selected colours
+     * @param currentIndex the typist currently being checked
+     * @return true if another typist already uses the colour
+     */
+    private boolean colourIsUsedByAnotherTypist(String colour, String[] selectedColours, int currentIndex)
+    {
+        for (int i = 0; i < selectedColours.length; i++)
+        {
+            if (i != currentIndex && colour.equals(selectedColours[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Custom renderer for the colour dropdown.
+     * Displays each colour option using its actual colour.
+     */
+    private class ColourComboBoxRenderer extends JPanel implements ListCellRenderer<String>
+    {
+        private JLabel colourSquare;
+        private JLabel colourName;
+
+        public ColourComboBoxRenderer()
+        {
+            setLayout(new FlowLayout(FlowLayout.LEFT, 6, 2));
+            setOpaque(true);
+
+            colourSquare = new JLabel("■");
+            colourSquare.setFont(new Font("Arial", Font.BOLD, 16));
+
+            colourName = new JLabel();
+            colourName.setFont(new Font("Arial", Font.BOLD, 12));
+
+            add(colourSquare);
+            add(colourName);
+        }
+
+        public Component getListCellRendererComponent(
+            JList<? extends String> list,
+            String value,
+            int index,
+            boolean isSelected,
+            boolean cellHasFocus)
+        {
+            Color colour = getColourFromName(value);
+
+            colourSquare.setForeground(colour);
+            colourName.setText(value);
+
+            if (index == -1)
+            {
+                colourName.setForeground(colour);
+            }
+            else
+            {
+                colourName.setForeground(isSelected ? Color.WHITE : TEXT_LIGHT);
+            }
+
+            if (isSelected)
+            {
+                setBackground(PURPLE_DARK);
+            }
+            else
+            {
+                setBackground(PANEL_DARK);
+            }
+
+            return this;
+        }
+    }
+
+    /**
+     * Custom renderer for the symbol dropdown.
+     * Displays symbols in the typist's selected progress colour.
+     */
+    private class SymbolComboBoxRenderer extends JLabel implements ListCellRenderer<String>
+    {
+        private int typistIndex;
+
+        public SymbolComboBoxRenderer(int typistIndex)
+        {
+            this.typistIndex = typistIndex;
+            setOpaque(true);
+            setFont(getUnicodeFriendlyFont(Font.BOLD, 15));
+            setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 8));
+        }
+
+        public Component getListCellRendererComponent(
+            JList<? extends String> list,
+            String value,
+            int index,
+            boolean isSelected,
+            boolean cellHasFocus)
+        {
+            setText(value == null ? "" : value);
+            setForeground(getSelectedColourSafe(typistIndex));
+            setBackground(isSelected ? PURPLE_DARK : PANEL_DARK);
+            return this;
+        }
     }
 
     /**
@@ -1141,11 +2193,13 @@ public class TypingRaceGUI
                 }
 
                 symbolBoxes[i].setSelectedItem(currentSymbol);
+                symbolBoxes[i].setRenderer(new SymbolComboBoxRenderer(i));
+                symbolBoxes[i].setForeground(getSelectedColourSafe(i));
 
                 String hex = toHex(getSelectedColourSafe(i));
 
-                typistTabbedPane.setTitleAt(i,
-                    "<html><font color='" + hex + "'>" + currentSymbol + "</font> " + typistNames[i] + "</html>"
+                typistTabbedPane.setTabComponentAt(i,
+                    createTypistTabLabel(getSymbolGlyph(currentSymbol), typistNames[i], hex)
                 );
             }
         }
@@ -1182,8 +2236,8 @@ public class TypingRaceGUI
      */
     private JPanel createAccessoriesPanel(int index)
     {
-        JPanel panel = new JPanel(new GridLayout(4, 1, 5, 5));
-        panel.setBorder(BorderFactory.createTitledBorder("Accessories"));
+        JPanel panel = new JPanel(new GridLayout(4, 1, 8, 8));
+        panel.setBorder(createThemedBorder("Accessories"));
 
         wristSupportBoxes[index] = new JCheckBox("Wrist Support - reduces burnout duration");
         energyDrinkBoxes[index] = new JCheckBox("Energy Drink - boosts accuracy early, reduces later");
@@ -1199,6 +2253,11 @@ public class TypingRaceGUI
         panel.add(energyDrinkBoxes[index]);
         panel.add(noiseCancellingBoxes[index]);
         panel.add(impactLabels[index]);
+        styleSectionPanel(panel);
+        styleCheckBox(wristSupportBoxes[index]);
+        styleCheckBox(energyDrinkBoxes[index]);
+        styleCheckBox(noiseCancellingBoxes[index]);
+        styleLabel(impactLabels[index]);
 
         return panel;
     }
@@ -1251,7 +2310,7 @@ public class TypingRaceGUI
         {
             String name = typistNames[i];
             String selectedSymbol = (String) symbolBoxes[i].getSelectedItem();
-            char symbol = selectedSymbol.charAt(0);
+            char symbol = getSymbolGlyph(selectedSymbol).charAt(0);
 
             double accuracy = 0.70;
 
@@ -1309,15 +2368,62 @@ public class TypingRaceGUI
         if ("Custom Passage".equals(selectedOption))
         {
             customPassageArea.setEnabled(true);
-            selectedPassage = customPassageArea.getText();
+            selectedPassage = getCustomPassageText();
+
+            if (selectedPassage.isEmpty() && !customPassageArea.hasFocus())
+            {
+                showCustomPassagePlaceholder();
+            }
         }
         else
         {
             customPassageArea.setEnabled(false);
             selectedPassage = selectedOption.substring(selectedOption.indexOf(":") + 2);
+            if (customPassageArea.getText().trim().isEmpty())
+            {
+                showCustomPassagePlaceholder();
+            }
         }
 
         passageLengthLabel.setText("Passage length: " + selectedPassage.length() + " characters");
+    }
+
+    /**
+     * Gets the custom passage text while ignoring placeholder text.
+     *
+     * @return the custom passage typed by the user
+     */
+    private String getCustomPassageText()
+    {
+        if (showingCustomPassagePlaceholder)
+        {
+            return "";
+        }
+
+        return customPassageArea.getText();
+    }
+
+    /**
+     * Displays muted placeholder text in the custom passage area.
+     */
+    private void showCustomPassagePlaceholder()
+    {
+        showingCustomPassagePlaceholder = true;
+        customPassageArea.setForeground(TEXT_MUTED);
+        customPassageArea.setText(CUSTOM_PASSAGE_PLACEHOLDER);
+    }
+
+    /**
+     * Clears placeholder text when the user starts typing a custom passage.
+     */
+    private void clearCustomPassagePlaceholder()
+    {
+        if (showingCustomPassagePlaceholder)
+        {
+            showingCustomPassagePlaceholder = false;
+            customPassageArea.setText("");
+            customPassageArea.setForeground(TEXT_LIGHT);
+        }
     }
 
     /**

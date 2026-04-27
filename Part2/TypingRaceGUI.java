@@ -14,6 +14,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
+import java.awt.geom.Path2D;
 import java.util.ArrayList;
 
 /**
@@ -1148,6 +1149,7 @@ public class TypingRaceGUI
         statsTabs.addTab("Personal Bests", createPersonalBestsPanel());
         statsTabs.addTab("Race History", createRaceHistoryPanel());
         statsTabs.addTab("Comparison", createComparisonPanel());
+        statsTabs.addTab("Charts", createChartsPanel());
 
         panel.add(statsTabs, BorderLayout.CENTER);
         stylePanel(panel);
@@ -1395,6 +1397,75 @@ public class TypingRaceGUI
     }
 
     /**
+     * Creates the graphical chart panel for performance trends.
+     *
+     * @return the charts panel
+     */
+    private JPanel createChartsPanel()
+    {
+        int[] recordedTypistIndexes = getTypistsWithRaceData();
+
+        if (recordedTypistIndexes.length == 0)
+        {
+            return createPlaceholderPanel("No chart data yet. Run a race to start drawing trends.");
+        }
+
+        JPanel panel = new JPanel(new BorderLayout(14, 14));
+        panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+
+        JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 8));
+        JPanel typistSelectionPanel = new JPanel(new GridLayout(0, 3, 10, 4));
+        JCheckBox[] typistSelectionBoxes = new JCheckBox[recordedTypistIndexes.length];
+
+        for (int i = 0; i < recordedTypistIndexes.length; i++)
+        {
+            int typistIndex = recordedTypistIndexes[i];
+            typistSelectionBoxes[i] = new JCheckBox(typistNames[typistIndex]);
+            typistSelectionBoxes[i].setSelected(true);
+            typistSelectionPanel.add(typistSelectionBoxes[i]);
+        }
+
+        String[] metrics = {"WPM", "Accuracy %", "Burnouts", "Mistypes"};
+        JComboBox<String> metricBox = new JComboBox<>(metrics);
+        PerformanceChartPanel chartPanel = new PerformanceChartPanel(
+            recordedTypistIndexes,
+            typistSelectionBoxes,
+            metricBox
+        );
+
+        JLabel typistsLabel = new JLabel("Typists:");
+        JLabel metricLabel = new JLabel("Metric:");
+
+        controlsPanel.add(typistsLabel);
+        controlsPanel.add(typistSelectionPanel);
+        controlsPanel.add(metricLabel);
+        controlsPanel.add(metricBox);
+
+        metricBox.addActionListener(e -> chartPanel.repaint());
+
+        panel.add(controlsPanel, BorderLayout.NORTH);
+        panel.add(chartPanel, BorderLayout.CENTER);
+
+        stylePanel(panel);
+        stylePanel(controlsPanel);
+        stylePanel(typistSelectionPanel);
+        styleLabel(typistsLabel);
+        styleLabel(metricLabel);
+        styleComboBox(metricBox);
+
+        for (int i = 0; i < typistSelectionBoxes.length; i++)
+        {
+            styleCheckBox(typistSelectionBoxes[i]);
+            typistSelectionBoxes[i].setForeground(getTypistDisplayColour(recordedTypistIndexes[i]));
+            typistSelectionBoxes[i].addActionListener(e -> chartPanel.repaint());
+        }
+
+        styleSectionPanel(chartPanel);
+
+        return panel;
+    }
+
+    /**
      * Creates a comparison table for selected typists and a metric.
      *
      * @param typistIndexes selected typist indexes
@@ -1495,6 +1566,39 @@ public class TypingRaceGUI
         }
 
         return formatDouble(performance.wpm);
+    }
+
+    /**
+     * Gets numeric metric data for charts.
+     *
+     * @param performance the performance record
+     * @param metric the selected metric
+     * @return numeric metric value
+     */
+    private double getChartMetricValue(RacePerformance performance, String metric)
+    {
+        if ("Accuracy %".equals(metric))
+        {
+            return performance.accuracyPercent;
+        }
+        else if ("Burnouts".equals(metric))
+        {
+            return performance.burnouts;
+        }
+        else if ("Mistypes".equals(metric))
+        {
+            return performance.mistypes;
+        }
+        else if ("Position".equals(metric))
+        {
+            return performance.position;
+        }
+        else if ("Accuracy Change".equals(metric))
+        {
+            return performance.accuracyChange;
+        }
+
+        return performance.wpm;
     }
 
     /**
@@ -3289,6 +3393,330 @@ public class TypingRaceGUI
         public boolean getScrollableTracksViewportHeight()
         {
             return false;
+        }
+    }
+
+    /**
+     * Draws performance trends as curved coloured line charts.
+     */
+    private class PerformanceChartPanel extends JPanel
+    {
+        private int[] typistIndexes;
+        private JCheckBox[] typistSelectionBoxes;
+        private JComboBox<String> metricBox;
+
+        public PerformanceChartPanel(
+            int[] typistIndexes,
+            JCheckBox[] typistSelectionBoxes,
+            JComboBox<String> metricBox)
+        {
+            this.typistIndexes = typistIndexes;
+            this.typistSelectionBoxes = typistSelectionBoxes;
+            this.metricBox = metricBox;
+            setPreferredSize(new Dimension(0, 430));
+            setBorder(new RoundedLineBorder(PURPLE_DARK, 12));
+        }
+
+        protected void paintComponent(Graphics graphics)
+        {
+            super.paintComponent(graphics);
+
+            Graphics2D graphics2D = (Graphics2D) graphics.create();
+            graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int left = 68;
+            int right = 190;
+            int top = 46;
+            int bottom = 62;
+            int chartWidth = getWidth() - left - right;
+            int chartHeight = getHeight() - top - bottom;
+
+            if (chartWidth <= 0 || chartHeight <= 0)
+            {
+                graphics2D.dispose();
+                return;
+            }
+
+            String metric = (String) metricBox.getSelectedItem();
+            double[] range = getChartRange(metric);
+
+            drawChartGrid(graphics2D, left, top, chartWidth, chartHeight, range, metric);
+            drawChartLines(graphics2D, left, top, chartWidth, chartHeight, range, metric);
+            drawChartLegend(graphics2D, getWidth() - right + 28, top + 8);
+
+            graphics2D.setColor(TEXT_LIGHT);
+            graphics2D.setFont(new Font(UI_FONT_NAME, Font.BOLD, 15));
+            graphics2D.drawString(metric + " Trend", left, 26);
+
+            graphics2D.dispose();
+        }
+
+        /**
+         * Draws the chart grid, axes, and scale labels.
+         */
+        private void drawChartGrid(
+            Graphics2D graphics2D,
+            int left,
+            int top,
+            int chartWidth,
+            int chartHeight,
+            double[] range,
+            String metric)
+        {
+            graphics2D.setFont(new Font(UI_FONT_NAME, Font.PLAIN, 11));
+
+            for (int i = 0; i <= 4; i++)
+            {
+                int y = top + (chartHeight * i / 4);
+                double value = range[1] - ((range[1] - range[0]) * i / 4.0);
+                String label = formatChartScaleValue(value, metric);
+
+                graphics2D.setColor(PURPLE_DARK);
+                graphics2D.drawLine(left, y, left + chartWidth, y);
+                graphics2D.setColor(TEXT_MUTED);
+                graphics2D.drawString(label, 12, y + 4);
+            }
+
+            int raceCount = Math.max(raceNumber, 1);
+
+            for (int race = 1; race <= raceCount; race++)
+            {
+                int x = getChartX(race, left, chartWidth);
+
+                graphics2D.setColor(new Color(34, 42, 66));
+                graphics2D.drawLine(x, top, x, top + chartHeight);
+                graphics2D.setColor(TEXT_MUTED);
+                graphics2D.drawString(String.valueOf(race), x - 3, top + chartHeight + 22);
+            }
+
+            graphics2D.setColor(TEXT_MUTED);
+            graphics2D.drawString("Race", left + chartWidth / 2 - 12, top + chartHeight + 45);
+            graphics2D.setColor(PURPLE);
+            graphics2D.drawRect(left, top, chartWidth, chartHeight);
+        }
+
+        /**
+         * Draws selected typist lines.
+         */
+        private void drawChartLines(
+            Graphics2D graphics2D,
+            int left,
+            int top,
+            int chartWidth,
+            int chartHeight,
+            double[] range,
+            String metric)
+        {
+            boolean anySelected = false;
+
+            for (int i = 0; i < typistIndexes.length; i++)
+            {
+                if (typistSelectionBoxes[i].isSelected())
+                {
+                    anySelected = true;
+                    drawSingleTypistLine(
+                        graphics2D,
+                        typistIndexes[i],
+                        left,
+                        top,
+                        chartWidth,
+                        chartHeight,
+                        range,
+                        metric
+                    );
+                }
+            }
+
+            if (!anySelected)
+            {
+                graphics2D.setColor(TEXT_MUTED);
+                graphics2D.setFont(new Font(UI_FONT_NAME, Font.PLAIN, 13));
+                graphics2D.drawString(
+                    "Select at least one typist to draw a chart.",
+                    left + 24,
+                    top + chartHeight / 2
+                );
+            }
+        }
+
+        /**
+         * Draws a single typist's curved line.
+         */
+        private void drawSingleTypistLine(
+            Graphics2D graphics2D,
+            int typistIndex,
+            int left,
+            int top,
+            int chartWidth,
+            int chartHeight,
+            double[] range,
+            String metric)
+        {
+            ArrayList<RacePerformance> history = typistRaceHistories[typistIndex];
+
+            if (history.isEmpty())
+            {
+                return;
+            }
+
+            Color colour = getTypistDisplayColour(typistIndex);
+            Path2D.Double path = new Path2D.Double();
+            boolean started = false;
+            int previousX = 0;
+            int previousY = 0;
+
+            graphics2D.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            graphics2D.setColor(colour);
+
+            for (RacePerformance performance : history)
+            {
+                int x = getChartX(performance.raceNumber, left, chartWidth);
+                int y = getChartY(getChartMetricValue(performance, metric), top, chartHeight, range);
+
+                if (!started)
+                {
+                    path.moveTo(x, y);
+                    started = true;
+                }
+                else
+                {
+                    path.quadTo(previousX, previousY, x, y);
+                }
+
+                previousX = x;
+                previousY = y;
+            }
+
+            graphics2D.draw(path);
+
+            for (RacePerformance performance : history)
+            {
+                int x = getChartX(performance.raceNumber, left, chartWidth);
+                int y = getChartY(getChartMetricValue(performance, metric), top, chartHeight, range);
+                graphics2D.fillOval(x - 4, y - 4, 8, 8);
+            }
+        }
+
+        /**
+         * Draws the typist colour legend.
+         */
+        private void drawChartLegend(Graphics2D graphics2D, int x, int y)
+        {
+            graphics2D.setFont(new Font(UI_FONT_NAME, Font.BOLD, 12));
+
+            for (int i = 0; i < typistIndexes.length; i++)
+            {
+                if (typistSelectionBoxes[i].isSelected())
+                {
+                    Color colour = getTypistDisplayColour(typistIndexes[i]);
+
+                    graphics2D.setColor(colour);
+                    graphics2D.fillRect(x, y - 9, 10, 10);
+                    graphics2D.drawString(typistNames[typistIndexes[i]], x + 18, y);
+                    y += 22;
+                }
+            }
+        }
+
+        /**
+         * Finds the visible value range for the selected metric.
+         */
+        private double[] getChartRange(String metric)
+        {
+            double min = Double.MAX_VALUE;
+            double max = -Double.MAX_VALUE;
+
+            for (int i = 0; i < typistIndexes.length; i++)
+            {
+                if (typistSelectionBoxes[i].isSelected())
+                {
+                    for (RacePerformance performance : typistRaceHistories[typistIndexes[i]])
+                    {
+                        double value = getChartMetricValue(performance, metric);
+                        min = Math.min(min, value);
+                        max = Math.max(max, value);
+                    }
+                }
+            }
+
+            if ("Burnouts".equals(metric) || "Mistypes".equals(metric))
+            {
+                if (max < 1.0)
+                {
+                    max = 1.0;
+                }
+
+                return new double[] {0.0, Math.ceil(max)};
+            }
+
+            if ("Accuracy %".equals(metric))
+            {
+                if (min == Double.MAX_VALUE)
+                {
+                    min = 95.0;
+                }
+
+                return new double[] {Math.max(0.0, min - 5.0), 100.0};
+            }
+
+            if (min == Double.MAX_VALUE)
+            {
+                min = 0.0;
+                max = 1.0;
+            }
+            else if (min == max)
+            {
+                min = min - 1.0;
+                max = max + 1.0;
+            }
+            else
+            {
+                double padding = (max - min) * 0.12;
+                min = min - padding;
+                max = max + padding;
+            }
+
+            return new double[] {min, max};
+        }
+
+        /**
+         * Formats chart scale labels for the selected metric.
+         */
+        private String formatChartScaleValue(double value, String metric)
+        {
+            if ("Burnouts".equals(metric) || "Mistypes".equals(metric))
+            {
+                return String.valueOf((int) Math.round(value));
+            }
+
+            if ("Accuracy %".equals(metric))
+            {
+                return String.valueOf((int) Math.round(value)) + "%";
+            }
+
+            return formatDouble(value);
+        }
+
+        /**
+         * Converts a race number into a chart x-coordinate.
+         */
+        private int getChartX(int currentRaceNumber, int left, int chartWidth)
+        {
+            if (raceNumber <= 1)
+            {
+                return left + chartWidth / 2;
+            }
+
+            return left + (int) (((double) (currentRaceNumber - 1) / (raceNumber - 1)) * chartWidth);
+        }
+
+        /**
+         * Converts a metric value into a chart y-coordinate.
+         */
+        private int getChartY(double value, int top, int chartHeight, double[] range)
+        {
+            double normalised = (value - range[0]) / (range[1] - range[0]);
+            return top + chartHeight - (int) (normalised * chartHeight);
         }
     }
 

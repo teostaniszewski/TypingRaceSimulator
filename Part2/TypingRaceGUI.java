@@ -6,8 +6,15 @@ import javax.swing.plaf.basic.BasicButtonUI;
 import javax.swing.plaf.basic.BasicComboBoxUI;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.plaf.basic.BasicTabbedPaneUI;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import javax.swing.text.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowEvent;
+import java.util.ArrayList;
 
 /**
  * Graphical user interface for the Typing Race Simulator.
@@ -20,6 +27,7 @@ public class TypingRaceGUI
 {
     private JFrame frame;
     private Timer raceTimer;
+    private Point windowDragStart;
 
     private Typist[] currentTypists;
     private JTextPane[] raceTextPanes;
@@ -76,6 +84,8 @@ public class TypingRaceGUI
 
     private String raceHistoryText;
     private int raceNumber;
+    private RacePerformance[] lastRacePerformances;
+    private ArrayList<RacePerformance>[] typistRaceHistories;
 
     private static final Color BG_DARK = new Color(11, 17, 32);
     private static final Color PANEL_DARK = new Color(17, 24, 39);
@@ -84,6 +94,7 @@ public class TypingRaceGUI
     private static final Color TEXT_LIGHT = new Color(245, 245, 255);
     private static final Color TEXT_MUTED = new Color(145, 155, 174);
     private static final Color CHECKBOX_TEXT = new Color(125, 211, 252);
+    private static final Color TABLE_ROW_ALT = new Color(21, 30, 48);
     private static final String CUSTOM_PASSAGE_PLACEHOLDER = "Type your custom passage here...";
     private static final String UI_FONT_NAME = "Segoe UI Symbol";
 
@@ -128,6 +139,8 @@ public class TypingRaceGUI
         selectedPassage = "";
         lastRaceStats = "No race has been run yet.\n\nStart a race to see statistics here.";
         bestWpmRecords = new double[typistNames.length];
+        lastRacePerformances = new RacePerformance[0];
+        initialiseRaceHistories();
         updatingSymbols = false;
         showingCustomPassagePlaceholder = false;
         raceHistoryText = "No race history available yet.";
@@ -143,13 +156,96 @@ public class TypingRaceGUI
         configureThemeDefaults();
 
         frame = new JFrame("Typing Race Simulator");
+        frame.setUndecorated(true);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1500, 850);
         frame.setLocationRelativeTo(null);
         frame.getContentPane().setBackground(BG_DARK);
 
-        frame.add(createMainPanel());
+        frame.setContentPane(createWindowContent(createMainPanel()));
         frame.setVisible(true);
+    }
+
+    /**
+     * Initialises per-typist race history storage.
+     */
+    @SuppressWarnings("unchecked")
+    private void initialiseRaceHistories()
+    {
+        typistRaceHistories = new ArrayList[typistNames.length];
+
+        for (int i = 0; i < typistRaceHistories.length; i++)
+        {
+            typistRaceHistories[i] = new ArrayList<>();
+        }
+    }
+
+    /**
+     * Wraps app screens with the custom window controls.
+     *
+     * @param contentPanel the screen content to display
+     * @return the complete window content panel
+     */
+    private JPanel createWindowContent(JPanel contentPanel)
+    {
+        JPanel windowPanel = new JPanel(new BorderLayout());
+
+        windowPanel.add(createCustomWindowBar(), BorderLayout.NORTH);
+        windowPanel.add(contentPanel, BorderLayout.CENTER);
+        stylePanel(windowPanel);
+
+        return windowPanel;
+    }
+
+    /**
+     * Creates a custom title bar with minimise and close controls.
+     *
+     * @return the custom window bar
+     */
+    private JPanel createCustomWindowBar()
+    {
+        JPanel titleBar = new JPanel(new BorderLayout());
+        titleBar.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 8));
+
+        JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        JButton minimiseButton = new JButton("-");
+        JButton closeButton = new JButton("X");
+
+        minimiseButton.setToolTipText("Minimise");
+        closeButton.setToolTipText("Close");
+        minimiseButton.addActionListener(e -> frame.setState(Frame.ICONIFIED));
+        closeButton.addActionListener(e ->
+            frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING))
+        );
+
+        controlsPanel.add(minimiseButton);
+        controlsPanel.add(closeButton);
+        titleBar.add(controlsPanel, BorderLayout.EAST);
+
+        MouseAdapter dragListener = new MouseAdapter() {
+            public void mousePressed(MouseEvent e)
+            {
+                windowDragStart = e.getPoint();
+            }
+
+            public void mouseDragged(MouseEvent e)
+            {
+                frame.setLocation(
+                    e.getXOnScreen() - windowDragStart.x,
+                    e.getYOnScreen() - windowDragStart.y
+                );
+            }
+        };
+
+        titleBar.addMouseListener(dragListener);
+        titleBar.addMouseMotionListener(dragListener);
+
+        stylePanel(titleBar);
+        stylePanel(controlsPanel);
+        styleWindowControlButton(minimiseButton);
+        styleWindowControlButton(closeButton);
+
+        return titleBar;
     }
 
     /**
@@ -160,17 +256,17 @@ public class TypingRaceGUI
     private JPanel createMainPanel()
     {
         JPanel mainPanel = new JPanel(new BorderLayout(12, 18));
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(24, 30, 26, 30));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(12, 30, 26, 30));
 
         JLabel titleLabel = new JLabel("< Typing Race Simulator />", JLabel.CENTER);
         titleLabel.setFont(new Font("Consolas", Font.BOLD, 30));
         titleLabel.setForeground(PURPLE);
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 2, 0));
 
         JTabbedPane tabbedPane = new JTabbedPane();
         tabbedPane.addTab("Race Configuration", createRaceConfigurationPanel());
         tabbedPane.addTab("Customise Typists", createCustomiseTypistsPanel());
-        tabbedPane.addTab("Stats", createStatsPanel());
+        tabbedPane.addTab("Statistics & Analytics", createStatsPanel());
 
         mainPanel.add(titleLabel, BorderLayout.NORTH);
         mainPanel.add(tabbedPane, BorderLayout.CENTER);
@@ -491,13 +587,13 @@ public class TypingRaceGUI
             startingAccuracies[i] = currentTypists[i].getAccuracy();
         }
 
-        JPanel racePanel = new JPanel(new BorderLayout(12, 18));
-        racePanel.setBorder(BorderFactory.createEmptyBorder(22, 24, 22, 34));
+        JPanel racePanel = new JPanel(new BorderLayout(12, 25));
+        racePanel.setBorder(BorderFactory.createEmptyBorder(14, 24, 22, 34));
 
         JLabel titleLabel = new JLabel("< Typing Race Simulator />", JLabel.CENTER);
         titleLabel.setFont(new Font("Consolas", Font.BOLD, 30));
         titleLabel.setForeground(PURPLE);
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
 
         JPanel lanesPanel = new ScrollableContentPanel();
         lanesPanel.setLayout(new BoxLayout(lanesPanel, BoxLayout.Y_AXIS));
@@ -518,7 +614,7 @@ public class TypingRaceGUI
         racePanel.add(lanesScrollPane, BorderLayout.CENTER);
         racePanel.add(createRaceButtonPanel(), BorderLayout.SOUTH);
 
-        frame.setContentPane(racePanel);
+        frame.setContentPane(createWindowContent(racePanel));
         frame.revalidate();
         frame.repaint();
         stylePanel(racePanel);
@@ -570,7 +666,7 @@ public class TypingRaceGUI
             raceTimer.stop();
         }
 
-        frame.setContentPane(createMainPanel());
+        frame.setContentPane(createWindowContent(createMainPanel()));
         frame.revalidate();
         frame.repaint();
     }
@@ -791,8 +887,7 @@ public class TypingRaceGUI
             finalAccuracies[i] = currentTypists[i].getAccuracy();
         }
 
-        lastRaceStats = buildStatsText();
-        addRaceToHistory(winner);
+        recordRaceStatistics(winner);
 
         if (viewStatsButton != null)
         {
@@ -857,26 +952,6 @@ public class TypingRaceGUI
     }
     
     /**
-     * Adds the completed race to the race history record.
-     *
-     * @param winner the winning typist
-     */
-    private void addRaceToHistory(Typist winner)
-    {
-        raceNumber++;
-
-        if (raceNumber == 1)
-        {
-            raceHistoryText = "";
-        }
-
-        raceHistoryText += "Race " + raceNumber + "\n";
-        raceHistoryText += "Winner: " + winner.getName() + "\n";
-        raceHistoryText += lastRaceStats;
-        raceHistoryText += "------------------------------\n\n";
-    }
-
-    /**
      * Updates the status label for one typist.
      *
      * @param index the index of the typist
@@ -907,69 +982,48 @@ public class TypingRaceGUI
     private void showStatsWindow()
     {
         JFrame statsFrame = new JFrame("Race Statistics");
-        statsFrame.setSize(820, 560);
+        statsFrame.setUndecorated(true);
+        statsFrame.setSize(1120, 355);
         statsFrame.setLocationRelativeTo(frame);
         statsFrame.getContentPane().setBackground(BG_DARK);
-        statsFrame.add(createStatsTextPanel(lastRaceStats));
+
+        JPanel panel = new JPanel(new BorderLayout(12, 12));
+        panel.setBorder(BorderFactory.createCompoundBorder(
+            new RoundedLineBorder(PURPLE, 12),
+            BorderFactory.createEmptyBorder(12, 12, 12, 12)
+        ));
+        JLabel titleLabel = new JLabel("Race Statistics", JLabel.CENTER);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton closeButton = new JButton("Close");
+        closeButton.addActionListener(e -> statsFrame.dispose());
+
+        buttonPanel.add(closeButton);
+        panel.add(titleLabel, BorderLayout.NORTH);
+        panel.add(createLastRacePanel(), BorderLayout.CENTER);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        stylePanel(panel);
+        stylePanel(buttonPanel);
+        styleLabel(titleLabel);
+        styleButton(closeButton);
+
+        statsFrame.add(panel);
         statsFrame.setVisible(true);
     }
 
     /**
-     * Builds a comparison view for two selected typists.
+     * Records calculated statistics for the completed race.
      *
-     * @param firstIndex the first typist index
-     * @param secondIndex the second typist index
-     * @return formatted comparison statistics
+     * @param winner the winning typist
      */
-    private String buildComparisonText(int firstIndex, int secondIndex)
+    private void recordRaceStatistics(Typist winner)
     {
-        if (currentTypists == null)
-        {
-            return "No comparison data available yet.\n\nRun a race first.";
-        }
+        raceNumber++;
 
-        if (firstIndex >= currentTypists.length || secondIndex >= currentTypists.length)
-        {
-            return "One or both selected typists did not take part in the last race.";
-        }
-
-        if (firstIndex == secondIndex)
-        {
-            return "Please choose two different typists to compare.";
-        }
-
-        return "Comparison View:\n\n"
-            + buildSingleTypistComparison(firstIndex)
-            + "\n------------------------------\n\n"
-            + buildSingleTypistComparison(secondIndex);
-    }
-
-    /**
-     * Builds comparison text for one typist.
-     *
-     * @param index the typist index
-     * @return formatted typist comparison text
-     */
-    private String buildSingleTypistComparison(int index)
-    {
-        return currentTypists[index].getName()
-            + "\nProgress: " + currentTypists[index].getProgress() + " / " + selectedPassage.length()
-            + "\nMistypes: " + mistypeCounts[index]
-            + "\nBurnouts: " + burnoutCounts[index]
-            + "\nStarting accuracy: " + String.format("%.2f", startingAccuracies[index])
-            + "\nFinal accuracy: " + String.format("%.2f", finalAccuracies[index])
-            + "\nAccuracy change: " + String.format("%.2f", finalAccuracies[index] - startingAccuracies[index]);
-    }
-
-    /**
-     * Builds the race statistics text.
-     *
-     * @return formatted race statistics
-     */
-    private String buildStatsText()
-    {
         double elapsedMinutes = (System.currentTimeMillis() - raceStartTime) / 60000.0;
-        String stats = "Race Statistics:\n\n";
+        lastRacePerformances = new RacePerformance[currentTypists.length];
+        int[] positions = calculateRacePositions();
 
         for (int i = 0; i < currentTypists.length; i++)
         {
@@ -981,11 +1035,6 @@ public class TypingRaceGUI
                 wpm = wordsTyped / elapsedMinutes;
             }
 
-            if (wpm > bestWpmRecords[i])
-            {
-                bestWpmRecords[i] = wpm;
-            }
-
             int totalAttempts = currentTypists[i].getProgress() + mistypeCounts[i];
             double accuracyPercent = 100.0;
 
@@ -994,18 +1043,92 @@ public class TypingRaceGUI
                 accuracyPercent = ((double) currentTypists[i].getProgress() / totalAttempts) * 100.0;
             }
 
-            stats += currentTypists[i].getName()
-                + "\nWPM: " + String.format("%.2f", wpm)
-                + "\nAccuracy percentage: " + String.format("%.2f", accuracyPercent) + "%"
-                + "\nMistypes: " + mistypeCounts[i]
-                + "\nBurnouts: " + burnoutCounts[i]
-                + "\nStarting accuracy: " + String.format("%.2f", startingAccuracies[i])
-                + "\nFinal accuracy: " + String.format("%.2f", finalAccuracies[i])
-                + "\nAccuracy change: " + String.format("%.2f", finalAccuracies[i] - startingAccuracies[i])
-                + "\n\n";
+            RacePerformance performance = new RacePerformance(
+                raceNumber,
+                i,
+                currentTypists[i].getName(),
+                positions[i],
+                wpm,
+                accuracyPercent,
+                mistypeCounts[i],
+                burnoutCounts[i],
+                startingAccuracies[i],
+                finalAccuracies[i],
+                currentTypists[i] == winner
+            );
+
+            lastRacePerformances[i] = performance;
+            typistRaceHistories[i].add(performance);
+
+            if (wpm > bestWpmRecords[i])
+            {
+                bestWpmRecords[i] = wpm;
+            }
         }
 
-        return stats;
+        lastRaceStats = "Race " + raceNumber + " statistics recorded.";
+        raceHistoryText = lastRaceStats;
+    }
+
+    /**
+     * Calculates finishing positions from progress through the final race state.
+     *
+     * @return position for each typist index
+     */
+    private int[] calculateRacePositions()
+    {
+        int[] positions = new int[currentTypists.length];
+        boolean[] assigned = new boolean[currentTypists.length];
+
+        for (int position = 1; position <= currentTypists.length; position++)
+        {
+            int bestIndex = -1;
+
+            for (int i = 0; i < currentTypists.length; i++)
+            {
+                if (!assigned[i] && (bestIndex == -1 || typistFinishedAheadOf(i, bestIndex)))
+                {
+                    bestIndex = i;
+                }
+            }
+
+            assigned[bestIndex] = true;
+            positions[bestIndex] = position;
+        }
+
+        return positions;
+    }
+
+    /**
+     * Compares two typists when assigning race positions.
+     *
+     * @param firstIndex the first typist index
+     * @param secondIndex the second typist index
+     * @return true if the first typist should be placed ahead
+     */
+    private boolean typistFinishedAheadOf(int firstIndex, int secondIndex)
+    {
+        if (currentTypists[firstIndex].getProgress() != currentTypists[secondIndex].getProgress())
+        {
+            return currentTypists[firstIndex].getProgress() > currentTypists[secondIndex].getProgress();
+        }
+
+        if (mistypeCounts[firstIndex] != mistypeCounts[secondIndex])
+        {
+            return mistypeCounts[firstIndex] < mistypeCounts[secondIndex];
+        }
+
+        if (burnoutCounts[firstIndex] != burnoutCounts[secondIndex])
+        {
+            return burnoutCounts[firstIndex] < burnoutCounts[secondIndex];
+        }
+
+        if (finalAccuracies[firstIndex] != finalAccuracies[secondIndex])
+        {
+            return finalAccuracies[firstIndex] > finalAccuracies[secondIndex];
+        }
+
+        return firstIndex < secondIndex;
     }
 
     /**
@@ -1021,11 +1144,10 @@ public class TypingRaceGUI
 
         JTabbedPane statsTabs = new JTabbedPane();
 
-        statsTabs.addTab("Last Race", createStatsTextPanel(lastRaceStats));
-        statsTabs.addTab("Personal Bests", createStatsTextPanel(buildPersonalBestsText()));
-        statsTabs.addTab("Race History", createStatsTextPanel(raceHistoryText));
+        statsTabs.addTab("Last Race", createLastRacePanel());
+        statsTabs.addTab("Personal Bests", createPersonalBestsPanel());
+        statsTabs.addTab("Race History", createRaceHistoryPanel());
         statsTabs.addTab("Comparison", createComparisonPanel());
-        statsTabs.addTab("Charts", createStatsTextPanel("Graphical display will be added here."));
 
         panel.add(statsTabs, BorderLayout.CENTER);
         stylePanel(panel);
@@ -1035,48 +1157,147 @@ public class TypingRaceGUI
     }
 
     /**
-     * Builds the personal best WPM statistics text.
+     * Creates the last race statistics table.
      *
-     * @return formatted personal best statistics
+     * @return the last race statistics panel
      */
-    private String buildPersonalBestsText()
+    private JPanel createLastRacePanel()
     {
-        String text = "Personal Bests:\n\n";
+        String[] columns = {
+            "Position",
+            "Typist",
+            "WPM",
+            "Accuracy %",
+            "Mistypes",
+            "Burnouts",
+            "Start Accuracy",
+            "Final Accuracy",
+            "Accuracy Change"
+        };
 
-        for (int i = 0; i < typistNames.length; i++)
+        if (lastRacePerformances == null || lastRacePerformances.length == 0)
         {
-            text += typistNames[i]
-                + " - Best WPM: "
-                + String.format("%.2f", bestWpmRecords[i])
-                + "\n";
+            return createPlaceholderPanel("No race data yet. Run a race to see performance metrics.");
         }
 
-        return text;
+        Object[][] rows = new Object[lastRacePerformances.length][columns.length];
+        RacePerformance[] orderedPerformances = getLastRacePerformancesByPosition();
+
+        for (int i = 0; i < orderedPerformances.length; i++)
+        {
+            RacePerformance performance = orderedPerformances[i];
+            rows[i] = createPerformanceRow(performance);
+        }
+
+        return createTablePanel(rows, columns);
     }
 
     /**
-     * Creates a simple scrollable text panel for a statistics section.
+     * Gets last race performances ordered by finishing position.
      *
-     * @param text the text to display
-     * @return the text statistics panel
+     * @return ordered race performance data
      */
-    private JPanel createStatsTextPanel(String text)
+    private RacePerformance[] getLastRacePerformancesByPosition()
     {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+        RacePerformance[] orderedPerformances = new RacePerformance[lastRacePerformances.length];
 
-        JTextArea textArea = new JTextArea(text);
-        textArea.setEditable(false);
-        textArea.setLineWrap(true);
-        textArea.setWrapStyleWord(true);
+        for (int i = 0; i < lastRacePerformances.length; i++)
+        {
+            orderedPerformances[i] = lastRacePerformances[i];
+        }
 
-        JScrollPane scrollPane = new JScrollPane(textArea);
+        for (int i = 0; i < orderedPerformances.length - 1; i++)
+        {
+            for (int j = i + 1; j < orderedPerformances.length; j++)
+            {
+                if (orderedPerformances[j].position < orderedPerformances[i].position)
+                {
+                    RacePerformance temp = orderedPerformances[i];
+                    orderedPerformances[i] = orderedPerformances[j];
+                    orderedPerformances[j] = temp;
+                }
+            }
+        }
 
-        panel.add(scrollPane, BorderLayout.CENTER);
-        stylePanel(panel);
-        styleTextArea(textArea);
-        styleScrollPane(scrollPane);
-        return panel;
+        return orderedPerformances;
+    }
+
+    /**
+     * Creates the personal best WPM table.
+     *
+     * @return the personal bests panel
+     */
+    private JPanel createPersonalBestsPanel()
+    {
+        String[] columns = {"Typist", "Best WPM", "Races Recorded"};
+        int rowCount = countTypistsWithRaceData();
+
+        if (rowCount == 0)
+        {
+            return createPlaceholderPanel("No personal bests yet. Run a race to record WPM.");
+        }
+
+        Object[][] rows = new Object[rowCount][columns.length];
+        int row = 0;
+
+        for (int i = 0; i < typistNames.length; i++)
+        {
+            if (!typistRaceHistories[i].isEmpty())
+            {
+                rows[row][0] = typistNames[i];
+                rows[row][1] = formatDouble(bestWpmRecords[i]);
+                rows[row][2] = typistRaceHistories[i].size();
+                row++;
+            }
+        }
+
+        return createTablePanel(rows, columns);
+    }
+
+    /**
+     * Creates the full race history table.
+     *
+     * @return the race history panel
+     */
+    private JPanel createRaceHistoryPanel()
+    {
+        String[] columns = {
+            "Race",
+            "Position",
+            "Typist",
+            "WPM",
+            "Accuracy %",
+            "Mistypes",
+            "Burnouts",
+            "Accuracy Change"
+        };
+        int rowCount = countRaceHistoryRows();
+
+        if (rowCount == 0)
+        {
+            return createPlaceholderPanel("No race history yet. Run a race to start tracking trends.");
+        }
+
+        Object[][] rows = new Object[rowCount][columns.length];
+        int row = 0;
+
+        for (int i = 0; i < typistRaceHistories.length; i++)
+        {
+            for (RacePerformance performance : typistRaceHistories[i])
+            {
+                rows[row][0] = performance.raceNumber;
+                rows[row][1] = performance.position;
+                rows[row][2] = performance.typistName;
+                rows[row][3] = formatDouble(performance.wpm);
+                rows[row][4] = formatDouble(performance.accuracyPercent) + "%";
+                rows[row][5] = performance.mistypes;
+                rows[row][6] = performance.burnouts;
+                rows[row][7] = formatSignedDouble(performance.accuracyChange);
+                row++;
+            }
+        }
+
+        return createTablePanel(rows, columns);
     }
 
     /**
@@ -1090,98 +1311,345 @@ public class TypingRaceGUI
         panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
         JPanel selectionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 8));
+        JPanel tableHolder = new JPanel(new BorderLayout());
 
-        JComboBox<String> firstTypistBox = new JComboBox<>(typistNames);
-        JComboBox<String> secondTypistBox = new JComboBox<>(typistNames);
+        int[] recordedTypistIndexes = getTypistsWithRaceData();
 
-        firstTypistBox.setSelectedIndex(0);
-        secondTypistBox.setSelectedIndex(1);
+        if (recordedTypistIndexes.length < 2)
+        {
+            return createPlaceholderPanel("Run races with at least two typists before comparing performance.");
+        }
 
-        JTextArea comparisonArea = new JTextArea();
-        comparisonArea.setEditable(false);
+        JPanel typistSelectionPanel = new JPanel(new GridLayout(0, 3, 10, 4));
+        JCheckBox[] typistSelectionBoxes = new JCheckBox[recordedTypistIndexes.length];
+
+        for (int i = 0; i < recordedTypistIndexes.length; i++)
+        {
+            typistSelectionBoxes[i] = new JCheckBox(typistNames[recordedTypistIndexes[i]]);
+            typistSelectionBoxes[i].setSelected(i < 2);
+            typistSelectionPanel.add(typistSelectionBoxes[i]);
+        }
+
+        String[] metrics = {"WPM", "Accuracy %", "Burnouts", "Mistypes"};
+        JComboBox<String> metricBox = new JComboBox<>(metrics);
 
         JButton compareButton = new JButton("Compare");
         compareButton.addActionListener(e -> {
-            int firstIndex = firstTypistBox.getSelectedIndex();
-            int secondIndex = secondTypistBox.getSelectedIndex();
+            int selectedCount = countSelectedBoxes(typistSelectionBoxes);
 
-            if (firstIndex == secondIndex)
+            if (selectedCount < 2)
             {
                 JOptionPane.showMessageDialog(panel,
-                    "Please select two different typists.",
+                    "Please select at least two typists.",
                     "Invalid Selection",
                     JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
-            comparisonArea.setText(buildComparisonText(firstIndex, secondIndex));
+            int[] selectedTypistIndexes = new int[selectedCount];
+            int selectedIndex = 0;
+
+            for (int i = 0; i < typistSelectionBoxes.length; i++)
+            {
+                if (typistSelectionBoxes[i].isSelected())
+                {
+                    selectedTypistIndexes[selectedIndex] = recordedTypistIndexes[i];
+                    selectedIndex++;
+                }
+            }
+
+            replacePanelContent(tableHolder,
+                createComparisonTablePanel(selectedTypistIndexes, (String) metricBox.getSelectedItem())
+            );
         });
 
-        JLabel firstLabel = new JLabel("Typist 1:");
-        JLabel secondLabel = new JLabel("Typist 2:");
+        JLabel typistsLabel = new JLabel("Typists:");
+        JLabel metricLabel = new JLabel("Metric:");
 
-        selectionPanel.add(firstLabel);
-        selectionPanel.add(firstTypistBox);
-        selectionPanel.add(secondLabel);
-        selectionPanel.add(secondTypistBox);
+        selectionPanel.add(typistsLabel);
+        selectionPanel.add(typistSelectionPanel);
+        selectionPanel.add(metricLabel);
+        selectionPanel.add(metricBox);
         selectionPanel.add(compareButton);
 
-        firstTypistBox.addActionListener(e ->
-            updateComparisonDropdown(firstTypistBox, secondTypistBox)
-        );
-
-        secondTypistBox.addActionListener(e ->
-            updateComparisonDropdown(secondTypistBox, firstTypistBox)
-        );
-
-        updateComparisonDropdown(firstTypistBox, secondTypistBox);
-
-        comparisonArea.setText(buildComparisonText(0, 1));
+        tableHolder.add(createComparisonTablePanel(
+            new int[] {recordedTypistIndexes[0], recordedTypistIndexes[1]},
+            (String) metricBox.getSelectedItem()
+        ), BorderLayout.CENTER);
 
         panel.add(selectionPanel, BorderLayout.NORTH);
-        JScrollPane scrollPane = new JScrollPane(comparisonArea);
-
-        panel.add(scrollPane, BorderLayout.CENTER);
+        panel.add(tableHolder, BorderLayout.CENTER);
         stylePanel(panel);
         stylePanel(selectionPanel);
-        styleLabel(firstLabel);
-        styleLabel(secondLabel);
-        styleComboBox(firstTypistBox);
-        styleComboBox(secondTypistBox);
-        styleTextArea(comparisonArea);
-        styleScrollPane(scrollPane);
+        stylePanel(typistSelectionPanel);
+        styleLabel(typistsLabel);
+        styleLabel(metricLabel);
+        for (JCheckBox box : typistSelectionBoxes)
+        {
+            styleCheckBox(box);
+        }
+        styleComboBox(metricBox);
         styleButton(compareButton);
 
         return panel;
     }
 
     /**
-     * Updates a dropdown so it excludes the selected value of the other dropdown.
+     * Creates a comparison table for selected typists and a metric.
+     *
+     * @param typistIndexes selected typist indexes
+     * @param metric selected metric
+     * @return the comparison table panel
      */
-    private void updateComparisonDropdown(JComboBox<String> source, JComboBox<String> target)
+    private JPanel createComparisonTablePanel(int[] typistIndexes, String metric)
     {
-        String selected = (String) source.getSelectedItem();
-        String currentTargetSelection = (String) target.getSelectedItem();
+        String[] columns = new String[typistIndexes.length + 1];
+        columns[0] = "Race";
 
-        target.removeAllItems();
-
-        for (String name : typistNames)
+        for (int i = 0; i < typistIndexes.length; i++)
         {
-            if (!name.equals(selected))
+            columns[i + 1] = typistNames[typistIndexes[i]];
+        }
+
+        if (raceNumber == 0)
+        {
+            return createPlaceholderPanel("No comparison data available for the selected typists.");
+        }
+
+        Object[][] rows = new Object[raceNumber][columns.length];
+
+        for (int raceIndex = 0; raceIndex < raceNumber; raceIndex++)
+        {
+            int currentRaceNumber = raceIndex + 1;
+            rows[raceIndex][0] = currentRaceNumber;
+
+            for (int typistIndex = 0; typistIndex < typistIndexes.length; typistIndex++)
             {
-                target.addItem(name);
+                RacePerformance performance = findPerformanceForRace(
+                    typistIndexes[typistIndex],
+                    currentRaceNumber
+                );
+
+                if (performance != null)
+                {
+                    rows[raceIndex][typistIndex + 1] = getMetricValue(performance, metric);
+                }
+                else
+                {
+                    rows[raceIndex][typistIndex + 1] = "No race data";
+                }
             }
         }
 
-        // restore selection if still valid
-        if (currentTargetSelection != null && !currentTargetSelection.equals(selected))
+        return createTablePanel(rows, columns);
+    }
+
+    /**
+     * Finds one typist's performance for a specific race.
+     *
+     * @param typistIndex the typist index
+     * @param targetRaceNumber the race number to find
+     * @return the matching performance, or null if no data exists
+     */
+    private RacePerformance findPerformanceForRace(int typistIndex, int targetRaceNumber)
+    {
+        for (RacePerformance performance : typistRaceHistories[typistIndex])
         {
-            target.setSelectedItem(currentTargetSelection);
+            if (performance.raceNumber == targetRaceNumber)
+            {
+                return performance;
+            }
         }
-        else
+
+        return null;
+    }
+
+    /**
+     * Gets formatted metric data for one race performance.
+     *
+     * @param performance the performance record
+     * @param metric the selected metric
+     * @return formatted metric value
+     */
+    private Object getMetricValue(RacePerformance performance, String metric)
+    {
+        if ("Accuracy %".equals(metric))
         {
-            target.setSelectedIndex(0);
+            return formatDouble(performance.accuracyPercent) + "%";
         }
+        else if ("Burnouts".equals(metric))
+        {
+            return performance.burnouts;
+        }
+        else if ("Mistypes".equals(metric))
+        {
+            return performance.mistypes;
+        }
+        else if ("Position".equals(metric))
+        {
+            return performance.position;
+        }
+        else if ("Accuracy Change".equals(metric))
+        {
+            return formatSignedDouble(performance.accuracyChange);
+        }
+
+        return formatDouble(performance.wpm);
+    }
+
+    /**
+     * Counts selected check boxes.
+     *
+     * @param boxes the check boxes to count
+     * @return the selected count
+     */
+    private int countSelectedBoxes(JCheckBox[] boxes)
+    {
+        int count = 0;
+
+        for (JCheckBox box : boxes)
+        {
+            if (box.isSelected())
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Counts typists who have at least one race result.
+     *
+     * @return the number of typists with recorded race data
+     */
+    private int countTypistsWithRaceData()
+    {
+        int count = 0;
+
+        for (ArrayList<RacePerformance> history : typistRaceHistories)
+        {
+            if (!history.isEmpty())
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Counts all race history rows.
+     *
+     * @return the total number of stored performance rows
+     */
+    private int countRaceHistoryRows()
+    {
+        int count = 0;
+
+        for (ArrayList<RacePerformance> history : typistRaceHistories)
+        {
+            count += history.size();
+        }
+
+        return count;
+    }
+
+    /**
+     * Gets indexes for typists with recorded race data.
+     *
+     * @return typist indexes with race history
+     */
+    private int[] getTypistsWithRaceData()
+    {
+        int[] indexes = new int[countTypistsWithRaceData()];
+        int row = 0;
+
+        for (int i = 0; i < typistRaceHistories.length; i++)
+        {
+            if (!typistRaceHistories[i].isEmpty())
+            {
+                indexes[row] = i;
+                row++;
+            }
+        }
+
+        return indexes;
+    }
+
+    /**
+     * Gets typist names for a list of indexes.
+     *
+     * @param indexes the typist indexes
+     * @return typist names
+     */
+    private String[] getTypistNames(int[] indexes)
+    {
+        String[] names = new String[indexes.length];
+
+        for (int i = 0; i < indexes.length; i++)
+        {
+            names[i] = typistNames[indexes[i]];
+        }
+
+        return names;
+    }
+
+    /**
+     * Builds a row for a full performance table.
+     *
+     * @param performance the performance record
+     * @return table row data
+     */
+    private Object[] createPerformanceRow(RacePerformance performance)
+    {
+        return new Object[] {
+            performance.position,
+            performance.typistName,
+            formatDouble(performance.wpm),
+            formatDouble(performance.accuracyPercent) + "%",
+            performance.mistypes,
+            performance.burnouts,
+            formatDouble(performance.startAccuracy),
+            formatDouble(performance.finalAccuracy),
+            formatSignedDouble(performance.accuracyChange)
+        };
+    }
+
+    /**
+     * Replaces the content inside a holder panel.
+     *
+     * @param holder the panel receiving new content
+     * @param content the new content panel
+     */
+    private void replacePanelContent(JPanel holder, JPanel content)
+    {
+        holder.removeAll();
+        holder.add(content, BorderLayout.CENTER);
+        holder.revalidate();
+        holder.repaint();
+    }
+
+    /**
+     * Formats a double to two decimal places.
+     *
+     * @param value the value to format
+     * @return formatted value
+     */
+    private String formatDouble(double value)
+    {
+        return String.format("%.2f", value);
+    }
+
+    /**
+     * Formats a signed double to two decimal places.
+     *
+     * @param value the value to format
+     * @return formatted signed value
+     */
+    private String formatSignedDouble(double value)
+    {
+        return String.format("%+.2f", value);
     }
 
     /**
@@ -2064,6 +2532,69 @@ public class TypingRaceGUI
     }
 
     /**
+     * Creates a themed table panel from row and column data.
+     *
+     * @param rows table rows
+     * @param columns table columns
+     * @return themed table panel
+     */
+    private JPanel createTablePanel(Object[][] rows, String[] columns)
+    {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+
+        JTable table = new JTable(new DefaultTableModel(rows, columns) {
+            public boolean isCellEditable(int row, int column)
+            {
+                return false;
+            }
+        }) {
+            public Component prepareRenderer(javax.swing.table.TableCellRenderer renderer, int row, int column)
+            {
+                Component component = super.prepareRenderer(renderer, row, column);
+
+                if (!isRowSelected(row))
+                {
+                    component.setBackground(row % 2 == 0 ? PANEL_DARK : TABLE_ROW_ALT);
+                    component.setForeground(TEXT_LIGHT);
+                }
+
+                return component;
+            }
+        };
+        table.setAutoCreateRowSorter(true);
+        table.setFillsViewportHeight(true);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+
+        JScrollPane scrollPane = new JScrollPane(table);
+
+        panel.add(scrollPane, BorderLayout.CENTER);
+        stylePanel(panel);
+        styleTable(table);
+        styleScrollPane(scrollPane);
+        return panel;
+    }
+
+    /**
+     * Creates a themed placeholder panel for empty stats states.
+     *
+     * @param message the placeholder message
+     * @return themed placeholder panel
+     */
+    private JPanel createPlaceholderPanel(String message)
+    {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+
+        JLabel label = new JLabel(message);
+        panel.add(label);
+
+        stylePanel(panel);
+        styleImpactLabel(label);
+        return panel;
+    }
+
+    /**
      * Applies the dark purple theme to a panel.
      *
      * @param panel the panel to style
@@ -2114,6 +2645,22 @@ public class TypingRaceGUI
         button.setFont(new Font("Arial", Font.BOLD, 14));
         button.setBorder(BorderFactory.createEmptyBorder(11, 26, 11, 26));
         button.setUI(new RoundedButtonUI());
+    }
+
+    /**
+     * Applies the theme to custom window control buttons.
+     *
+     * @param button the window control button to style
+     */
+    private void styleWindowControlButton(JButton button)
+    {
+        button.setPreferredSize(new Dimension(38, 24));
+        button.setBackground(PANEL_DARK);
+        button.setForeground(TEXT_LIGHT);
+        button.setFocusPainted(false);
+        button.setBorder(new RoundedLineBorder(PURPLE_DARK, 8));
+        button.setFont(new Font("Arial", Font.BOLD, 12));
+        button.setOpaque(true);
     }
 
     /**
@@ -2180,6 +2727,49 @@ public class TypingRaceGUI
         checkBox.setFocusPainted(false);
         checkBox.setBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0));
         checkBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+    }
+
+    /**
+     * Applies the theme to data tables.
+     *
+     * @param table the table to style
+     */
+    private void styleTable(JTable table)
+    {
+        table.setBackground(PANEL_DARK);
+        table.setForeground(TEXT_LIGHT);
+        table.setGridColor(PURPLE_DARK);
+        table.setSelectionBackground(PURPLE_DARK);
+        table.setSelectionForeground(Color.WHITE);
+        table.setFont(new Font(UI_FONT_NAME, Font.PLAIN, 13));
+        table.setRowHeight(30);
+        table.setShowGrid(true);
+        table.setIntercellSpacing(new Dimension(1, 1));
+
+        DefaultTableCellRenderer cellRenderer = new DefaultTableCellRenderer();
+        cellRenderer.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
+        table.setDefaultRenderer(Object.class, cellRenderer);
+
+        JTableHeader header = table.getTableHeader();
+        header.setBackground(BG_DARK);
+        header.setForeground(CHECKBOX_TEXT);
+        header.setFont(new Font(UI_FONT_NAME, Font.BOLD, 13));
+        header.setBorder(BorderFactory.createLineBorder(PURPLE_DARK));
+    }
+
+    /**
+     * Applies the theme to lists.
+     *
+     * @param list the list to style
+     */
+    private void styleList(JList<?> list)
+    {
+        list.setBackground(PANEL_DARK);
+        list.setForeground(TEXT_LIGHT);
+        list.setSelectionBackground(PURPLE_DARK);
+        list.setSelectionForeground(Color.WHITE);
+        list.setFont(new Font(UI_FONT_NAME, Font.BOLD, 13));
+        list.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
     }
 
     /**
@@ -2699,6 +3289,52 @@ public class TypingRaceGUI
         public boolean getScrollableTracksViewportHeight()
         {
             return false;
+        }
+    }
+
+    /**
+     * Stores the calculated performance data for one typist in one race.
+     */
+    private class RacePerformance
+    {
+        private int raceNumber;
+        private int typistIndex;
+        private String typistName;
+        private int position;
+        private double wpm;
+        private double accuracyPercent;
+        private int mistypes;
+        private int burnouts;
+        private double startAccuracy;
+        private double finalAccuracy;
+        private double accuracyChange;
+        private boolean winner;
+
+        public RacePerformance(
+            int raceNumber,
+            int typistIndex,
+            String typistName,
+            int position,
+            double wpm,
+            double accuracyPercent,
+            int mistypes,
+            int burnouts,
+            double startAccuracy,
+            double finalAccuracy,
+            boolean winner)
+        {
+            this.raceNumber = raceNumber;
+            this.typistIndex = typistIndex;
+            this.typistName = typistName;
+            this.position = position;
+            this.wpm = wpm;
+            this.accuracyPercent = accuracyPercent;
+            this.mistypes = mistypes;
+            this.burnouts = burnouts;
+            this.startAccuracy = startAccuracy;
+            this.finalAccuracy = finalAccuracy;
+            this.accuracyChange = finalAccuracy - startAccuracy;
+            this.winner = winner;
         }
     }
 

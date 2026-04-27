@@ -3919,7 +3919,7 @@ public class TypingRaceGUI
                     min = 95.0;
                 }
 
-                return new double[] {Math.max(0.0, min - 5.0), 100.0};
+                return new double[] {Math.max(0.0, min), 100.0};
             }
 
             if (min == Double.MAX_VALUE)

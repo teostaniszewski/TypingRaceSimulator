@@ -4950,6 +4950,7 @@ public class TypingRaceGUI
      */
     public static void main(String[] args)
     {
-        new TypingRaceGUI();
+        TypingRaceGUI gui = new TypingRaceGUI();
+        gui.startRaceGUI();
     }
 }
